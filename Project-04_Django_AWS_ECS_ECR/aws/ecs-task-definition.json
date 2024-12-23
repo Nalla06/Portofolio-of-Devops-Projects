@@ -1,0 +1,19 @@
+{
+    "family": "django-task",
+    "containerDefinitions": [
+      {
+        "name": "django-container",
+        "image": "631172387421.dkr.ecr.us-east-1.amazonaws.com/hello-world-django-app:latest",
+        "memory": 512,
+        "cpu": 256,
+        "essential": true,
+        "portMappings": [
+          {
+            "containerPort": 8000,
+            "hostPort": 8000
+          }
+        ]
+      }
+    ]
+  }
+  
