@@ -1,0 +1,33 @@
+# Here’s an updated version of your Tomcat Security Group with the ALB allowed to access Tomcat:resource "aws_security_group" "tomcat_sg" {
+  name        = "tomcat_sg"
+  description = "Tomcat Security Group"
+  vpc_id      = aws_vpc.private_vpc.id
+
+  # Allow HTTP access to Tomcat (port 8080) from ALB
+  ingress {
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]  # ALB security group
+  }
+
+  # Allow SSH from Bastion Host for management
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["${aws_instance.bastion_host.private_ip}/32"]
+  }
+
+  # Egress: Allow to MySQL
+  egress {
+    description = "Allow MySQL traffic to Database"
+    from_port   = 3306
+    to_port     = 3306
+    protocol    = "tcp"
+    cidr_blocks = ["10.0.0.0/16"] # CIDR range of private vpc
+  }
+}
+
+# On Amazon Linux, you can check the following log file for the output of your script: 
+sudo cat /var/log/cloud-init-output.log
