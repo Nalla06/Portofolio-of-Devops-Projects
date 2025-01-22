@@ -8,15 +8,20 @@
 		<version>2.2.4.RELEASE</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.devopsrealtime</groupId>
-	<artifactId>dptweb</artifactId>
+	<groupId>com.devopsportfolio</groupId>
+	<artifactId>deploy-java-app-on-aws-3-tier</artifactId>
 	<version>1.0</version>
 	<packaging>war</packaging>
-	<name>dptweb</name>
-	<description>DPT DevOps project for Spring Boot</description>
+	 <name>Deploy Java App on AWS 3-Tier Architecture</name>
+    <description>DevOps project showcasing deployment of a Java application using AWS 3-Tier Architecture</description>
 
 	<properties>
 		<java.version>1.8</java.version>
+		<sonar.projectKey>Project-01_Deploying-Java-Appl-on-AWS-3-Tier-Architecture</sonar.projectKey>
+		<sonar.host.url>http://localhost:9000</sonar.host.url>
+        <sonar.login>squ_aa9125f7ec622586cc81e523490c2f84424b9948 </sonar.login>
+		<!-- GitHub Package Repository URL -->
+        <github.repo>your-github-username/my-artifacts-repo</github.repo>
 	</properties>
 
 	<dependencies>
@@ -35,11 +40,7 @@
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
 			<scope>runtime</scope>
-		</dependency>
-		
-		
-		
-		
+		</dependency>	
 		
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -65,13 +66,20 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
-		</plugins>
-	</build>
+			<!-- SonarQube plugin -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>3.9.0.2155</version>
+            </plugin>
+        </plugins>
+    </build>
+	<!-- GitHub Packages Repository Configuration -->
 <distributionManagement>
     <repository>
-        <id>central</id>
-        <name>a0nymgefaiwwu-artifactory-primary-0-releases</name>
-        <url>https://edshopdpt8.jfrog.io/artifactory/libs-release-local</url>
+        <id>github-packages</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/Nalla06/my-artifacts-repo</url>
     </repository>
 </distributionManagement> 
 
