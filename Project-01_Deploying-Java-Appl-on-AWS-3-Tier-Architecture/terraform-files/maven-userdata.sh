@@ -5,7 +5,7 @@ sudo yum update -y
 # Install Git
 sudo yum install -y git
 
-# Install JDK 11
+# Install JDK 17
 sudo yum install java-17 -y
 # Download Apache Maven
 MAVEN_VERSION=3.8.4
@@ -18,6 +18,8 @@ sudo ln -s /opt/apache-maven-${MAVEN_VERSION} /opt/maven
 # Update system PATH for Maven
 echo "export M2_HOME=/opt/maven" | sudo tee -a /etc/profile.d/maven.sh
 echo "export PATH=\$M2_HOME/bin:\$PATH" | sudo tee -a /etc/profile.d/maven.sh
+
+# Apply the changes to the environment
 source /etc/profile.d/maven.sh
 
 # Verify Maven installation

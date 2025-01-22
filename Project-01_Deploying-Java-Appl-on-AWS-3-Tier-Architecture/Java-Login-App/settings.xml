@@ -25,8 +25,11 @@
         <pluginRepository>
           <id>github-packages</id>
           <url>https://maven.pkg.github.com/Nalla06/my-artifacts-repo</url> <!-- Replace with your GitHub repository URL -->
+          <id>github-packages</id>
+          <url>https://maven.pkg.github.com/Nalla06/my-artifacts-repo</url> <!-- Replace with your GitHub repository URL -->
         </pluginRepository>
       </pluginRepositories>
+      <id>github</id>
       <id>github</id>
     </profile>
   </profiles>
@@ -34,5 +37,6 @@
   <activeProfiles>
     <activeProfile>github</activeProfile>
   </activeProfiles>
+
 
 </settings>

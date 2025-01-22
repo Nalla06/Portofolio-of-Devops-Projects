@@ -10,8 +10,12 @@
 	</parent>
 	<groupId>com.devopsportfolio</groupId>
 	<artifactId>deploy-java-app-on-aws-3-tier</artifactId>
+	<groupId>com.devopsportfolio</groupId>
+	<artifactId>deploy-java-app-on-aws-3-tier</artifactId>
 	<version>1.0</version>
 	<packaging>war</packaging>
+	 <name>Deploy Java App on AWS 3-Tier Architecture</name>
+    <description>DevOps project showcasing deployment of a Java application using AWS 3-Tier Architecture</description>
 	 <name>Deploy Java App on AWS 3-Tier Architecture</name>
     <description>DevOps project showcasing deployment of a Java application using AWS 3-Tier Architecture</description>
 
@@ -40,6 +44,7 @@
 			<groupId>mysql</groupId>
 			<artifactId>mysql-connector-java</artifactId>
 			<scope>runtime</scope>
+		</dependency>	
 		</dependency>	
 		
 		<dependency>
@@ -75,8 +80,21 @@
         </plugins>
     </build>
 	<!-- GitHub Packages Repository Configuration -->
+			</plugin>
+			<!-- SonarQube plugin -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>3.9.0.2155</version>
+            </plugin>
+        </plugins>
+    </build>
+	<!-- GitHub Packages Repository Configuration -->
 <distributionManagement>
     <repository>
+        <id>github-packages</id>
+            <name>GitHub Packages</name>
+            <url>https://maven.pkg.github.com/Nalla06/my-artifacts-repo</url>
         <id>github-packages</id>
             <name>GitHub Packages</name>
             <url>https://maven.pkg.github.com/Nalla06/my-artifacts-repo</url>
