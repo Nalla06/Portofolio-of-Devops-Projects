@@ -1,0 +1,84 @@
+pipeline {
+    agent any
+
+    environment {
+        // Define variables for the Docker image and repository paths
+        DOCKER_IMAGE_NAME = 'nalla06/tomcatserver' // Docker Hub image name
+        GITHUB_REPO_URL = 'https://github.com/Nalla06/Portofolio-of-Devops-Projects.git'
+        GITHUB_BRANCH = 'main'
+        ARTIFACTS_DIR = 'target'  // Directory for storing build artifacts
+        ARTIFACTS_PATH = 'Project-04_Dockerized_Jenkins_AWS/hello-world/target/*.jar'  // Path to JAR file
+    }
+
+    stages {
+        stage('Clone Repository') {
+            steps {
+                echo 'Cloning GitHub repository...'
+                // Clone the repository
+                git url: "${GITHUB_REPO_URL}", branch: "${GITHUB_BRANCH}"
+            }
+        }
+
+        stage('Pull Docker Image from Docker Hub') {
+            steps {
+                echo 'Pulling Docker image from Docker Hub...'
+                script {
+                    // Pull the Docker image from Docker Hub
+                    sh 'docker pull ${DOCKER_IMAGE_NAME}'
+                }
+            }
+        }
+
+        stage('Run Docker Container') {
+            steps {
+                echo 'Running Docker container...'
+                script {
+                    // Run the Docker container from the pulled image
+                    sh 'docker run -d -p 8085:8085 ${DOCKER_IMAGE_NAME}'
+                }
+            }
+        }
+
+        stage('Build Artifacts') {
+            steps {
+                echo 'Building artifacts...'
+                script {
+                    // Navigate to the directory containing the Maven project
+                    dir('Project-04_Dockerized_Jenkins_AWS/hello-world') {
+                        // Run Maven build to generate artifacts (JAR file)
+                        sh 'mvn clean install'
+                    }
+                }
+            }
+        }
+
+        stage('Archive Artifacts') {
+            steps {
+                echo 'Archiving build artifacts...'
+                script {
+                    // Archive the generated artifacts (JAR files)
+                    archiveArtifacts allowEmptyArchive: true, artifacts: "${ARTIFACTS_PATH}", followSymlinks: false
+                }
+            }
+        }
+
+        stage('Deploy Application') {
+            steps {
+                echo 'Deploying application...'
+                script {
+                    // Example deploy step (You can customize this to deploy the application to an environment)
+                    echo 'Deploying to the environment...'
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline completed successfully!'
+        }
+        failure {
+            echo 'Pipeline failed!'
+        }
+    }
+}
