@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: 2048-game-app
+spec:
+  replicas: 2  # You can adjust the number of replicas
+  selector:
+    matchLabels:
+      app: 2048-game-app
+  template:
+    metadata:
+      labels:
+        app: 2048-game-app
+    spec:
+      containers:
+        - name: 2048-game-app
+          image: nalla06/2048-game-app:latest
+          ports:
+            - containerPort: 80

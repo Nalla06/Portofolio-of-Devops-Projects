@@ -5,6 +5,8 @@ This repository showcases various DevOps projects that demonstrate my skills in 
 Summary:
 This project focuses on deploying a Java-based application using an AWS 3-tier architecture model. It emphasizes scalability, high availability, and security by utilizing AWS services like EC2, RDS, VPC, Auto Scaling, and Load Balancers. The application is built using Maven, with artifact management handled via JFrog Artifactory and static code analysis integrated with SonarCloud.
 
+![AWS](https://imgur.com/b9iHwVc.png)
+
 # Key Highlights:
 
 1. Designed a custom VPC with private and public subnets.
@@ -30,29 +32,30 @@ This project demonstrates the deployment of a Java Web application on a Docker c
 ### How Terraform Was Used:
 1. Provisioning Resources:
 
-. Terraform was used to provision the EC2 instance, security groups, and networking components.
-. Terraform configured the instance with a userdata.sh script, which handled:
-  . Installing Jenkins, Docker, Git, Maven, and Java.
-  . Installing required Jenkins plugins automatically.
+Terraform was used to provision the EC2 instance, security groups, and networking components.
+   . Terraform configured the instance with a userdata.sh script, which handled:
+   . Installing Jenkins, Docker, Git, Maven, and Java.
+   . Installing required Jenkins plugins automatically.
 
 2. User Data Configuration (userdata.sh):
   The userdata.sh script is a crucial part of the Terraform setup. It installs all dependencies, configures Jenkins with necessary plugins, and ensures Docker is ready to use. Here's what the script does:
-
-. Installs OpenJDK (Java).
-. Sets up Maven and Git.
-. Installs and configures Docker.
-. Installs Jenkins and required plugins.
+   . Installs OpenJDK (Java).
+   . Sets up Maven and Git.
+   . Installs and configures Docker.
+   . Installs Jenkins and required plugins.
 
 3. Automated Deployment Pipeline: After the infrastructure setup, Jenkins was used to run a  pipeline that:
 
-. Clones the repository.
-. Builds the Java web app with Maven.
-. Creates a Docker image and pushes it to Docker Hub.
-. Deploys the app as a Docker container.
+   . Clones the repository.
+   . Builds the Java web app with Maven.
+   . Creates a Docker image and pushes it to Docker Hub.
+   . Deploys the app as a Docker container.
 
 
 
-## Project-06 : 2048 Game App on EKS Deployment 
+# Project-06 : 2048 Game App on EKS Deployment 
+
+![EKS](https://imgur.com/oADneqS.png)
 
 This project demonstrates the deployment of the 2048 Game App on Amazon EKS using two methods:
 
