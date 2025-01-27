@@ -1,0 +1,34 @@
+# Type 1: Docker + eksctl
+
+This directory contains the implementation of the 2048 game app deployment using Docker, Kubernetes manifests, and `eksctl` for creating an Amazon EKS cluster.
+
+## Steps
+
+1. **Containerize the 2048 App**:
+   - Use the provided `Dockerfile` to build a container image.
+   - Push the image to Amazon ECR.
+
+2. **Create EKS Cluster**:
+   - Use `eksctl` to create an EKS cluster.
+
+3. **Deploy the App**:
+   - Apply the `deployment.yaml` and `service.yaml` manifests using `kubectl`.
+
+4. **Access the Application**:
+   - Retrieve the LoadBalancer's external IP and open the 2048 game in a browser.
+
+## Files
+
+- `Dockerfile`: Dockerfile to build the 2048 game app container.
+- `deployment.yaml`: Kubernetes Deployment manifest for the app.
+- `service.yaml`: Kubernetes Service manifest to expose the app.
+- `eks-cluster.yaml`: (Optional) eksctl configuration file for the cluster.
+
+## Commands Used
+
+### Build and Push Docker Image
+```bash
+docker build -t 2048-game .
+aws ecr create-repository --repository-name 2048-game
+docker tag 2048-game:latest <account-id>.dkr.ecr.<region>.amazonaws.com/2048-game:latest
+docker push <account-id>.dkr.ecr.<region>.amazonaws.com/2048-game:latest
