@@ -29,7 +29,7 @@ resource "aws_security_group" "jenkins_sg" {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["${chomp(data.http.my_ip.response_body)}/32"] # Allow SSH only from your IP
+    cidr_blocks = ["${chomp(data.http.my_ip.response_body)}/32"] # Restrict SSH access # Restrict SSH access to your IP
   }
 
   ingress {
@@ -38,11 +38,23 @@ resource "aws_security_group" "jenkins_sg" {
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"] # Jenkins access
   }
+  ingress {
+    from_port   = 8085
+    to_port     = 8085
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # tomcat access
+  }
     ingress {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"] # Allow HTTP access from anywhere
+  }
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  # Allow HTTPS access from anywhere (if using SSL/TLS)
   }
 
   egress {
@@ -55,7 +67,7 @@ resource "aws_security_group" "jenkins_sg" {
 
 resource "aws_instance" "jenkins_server" {
   ami           = "ami-0df8c184d5f6ae949" # Replace with your AMI ID
-  instance_type = "t2.micro"
+  instance_type = "t3.medium"
   key_name      = "linux-key-pair"
   user_data     = file("userdata.sh")
 
@@ -65,14 +77,15 @@ resource "aws_instance" "jenkins_server" {
   provisioner "remote-exec" {
     connection {
       type        = "ssh"
-      host        = self.public_ip # Use the instance's public IP
+      host     = aws_instance.jenkins_server.public_ip # Use the instance's public IP
       user        = "ec2-user"
-      private_key = data.aws_ssm_parameter.linux_key_pair.value
+      private_key = data.aws_ssm_parameter.linux_key_pair.value # Decode the private key
+      
     }
 
     inline = [
-      "echo Hello from Jenkins setup!",
-      "sudo yum install -y java-17", # Example: Install Java
+      "echo 'Ensuring system is ready for package installation...'",
+      "for i in {1..5}; do sudo yum update -y && sudo yum install -y java-17 && break || sleep 10; done"
     ]
   }
 
