@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main  # Trigger this workflow when changes are pushed to the main branch
+    paths:
+      - "Project-03_Django_AWS_ECS_ECR/**"  # Only trigger if files inside this subfolder are changed
 
 jobs:
   deploy:
