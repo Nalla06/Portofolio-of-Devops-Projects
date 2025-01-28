@@ -2,10 +2,12 @@
 This repository showcases various DevOps projects that demonstrate my skills in CI/CD, containerization, infrastructure automation, and cloud deployments. Each project includes practical examples of using tools like Jenkins, GitLab CI/CD, Docker, Kubernetes, Terraform, and AWS.
 
 ##  Project-01: Deploy Java Application on AWS 3-Tier Architecture
-Summary:
+
+#### Summary:
+
 This project focuses on deploying a Java-based application using an AWS 3-tier architecture model. It emphasizes scalability, high availability, and security by utilizing AWS services like EC2, RDS, VPC, Auto Scaling, and Load Balancers. The application is built using Maven, with artifact management handled via JFrog Artifactory and static code analysis integrated with SonarCloud.
 
-![AWS](https://imgur.com/b9iHwVc.png)
+![3-tier application](https://imgur.com/3XF0tlJ.png)
 
 # Key Highlights:
 

@@ -29,25 +29,26 @@ Installed Maven and Git for managing project dependencies and version control. B
 3. Integrate GitHub and Maven with Jenkins
 Configured Jenkins to:
 
-. Clone the GitHub repository containing the Java web app source code.
-. Use Maven to build the application and manage dependencies.
+    . Clone the GitHub repository containing the Java web app source code.
+    . Use Maven to build the application and manage dependencies.
 
 4. Setup Docker Host
-. Installed and configured Docker on the EC2 instance as part of the provisioning process. . The setup allows Docker to host and manage containers for the application.
+    . Installed and configured Docker on the EC2 instance as part of the provisioning process. . The setup allows Docker to host and manage containers for the application.
 
 5. Integrate Docker with Jenkins
 Enabled Jenkins to:
-. Build Docker images for the application.
-. Push the images to Docker Hub using authentication credentials.
+    . Build Docker images for the application.
+    . Push the images to Docker Hub using authentication credentials.
 
 6. Automate the Build and Deploy Process Using Jenkins
 Automated the entire pipeline through a Jenkinsfile. The pipeline performs the following:
 
-. Pulls the latest code from GitHub.
-. Builds the application using Maven.
-. Creates a Docker image for the application.
-. Pushes the Docker image to Docker Hub.
-. Deploys the Docker container on the same EC2 instance.
+    . Pulls the latest code from GitHub.
+    . Builds the application using Maven.
+    . Creates a Docker image for the application.
+    . Pushes the Docker image to Docker Hub.
+    . Deploys the Docker container on the same EC2 instance.
+    
 7. Test the Deployment
 Once the Docker container is running, the application can be tested via the exposed URL. Since a Tomcat Docker image is used, the application runs on port 8080 (default for Tomcat).
 
