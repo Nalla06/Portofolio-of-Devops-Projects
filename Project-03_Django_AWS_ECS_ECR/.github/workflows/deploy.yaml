@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - main  # Trigger the workflow on push to the 'main' branch
+      
     paths:
       - "Project-03_Django_AWS_ECS_ECR/**"  # Trigger on changes to any file inside this folder
   workflow_dispatch:  # Allows manual triggering from the GitHub UI
-  
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
