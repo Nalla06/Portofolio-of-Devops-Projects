@@ -34,7 +34,7 @@ jobs:
     # Step 4: Build Docker image
     - name: Build Docker image
       run: |
-        docker build -t django-app .
+        docker build -t django-app ./Project-03_Django_AWS_ECS_ECR
 
     # Step 5: Tag Docker image
     - name: Tag Docker image
