@@ -31,6 +31,25 @@ This setup includes the following resources:
 
 ![Docker](https://imgur.com/raGErLx.png)
 
+Project Workflow
+1. Set Up a VPC:
+    . Created a custom VPC with public and private subnets.
+    . Attached an Internet Gateway and NAT Gateway for secure connectivity.
+2. Build Security Groups:
+    . Configured security groups for the ALB, ECS services, and ECR to control traffic access.
+3. Create ECR Repository:
+    . Used Terraform to create an ECR repository for storing the Docker image.
+4. Build and Push Docker Image:
+    . Wrote a shell script to build the Docker image for the Django app and push it to ECR.
+5. Provision ECS Cluster and Services:
+    . Created an ECS cluster and deployed the Django app as a task definition.
+    . Configured the ECS service to run multiple tasks behind an ALB.
+6. Configure Load Balancer:
+    . Set up an Application Load Balancer to expose the Django app to the internet.
+7. Deploy Application:
+    . Verified the app was running by accessing the ALB's public DNS.
+
+
 ### Docker Workflow
 
 **Docker is an open platform software. It is used for developing, shipping, and running applications. Docker virtualizes the operating system of the computer on which it is installed and running. It provides the ability to package and run an application in a loosely isolated environment called a container. A container is a runnable instance of a docker image. You can create, start, stop, move, or delete a container using the Docker API or CLI. You can connect a container to one or more networks, attach storage to it, or even create a new docker image based on its current state.**

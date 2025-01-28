@@ -60,10 +60,10 @@ resource "aws_security_group" "ecs_service_sg" {
 
   # Allow inbound HTTP traffic (port 80) from ALB to ECS tasks
   ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    security_groups = [aws_security_group.alb_sg.id]
+    from_port        = 80
+    to_port          = 80
+    protocol         = "tcp"
+    security_groups  = [aws_security_group.alb_sg.id]
   }
 
   # Allow outbound traffic (can be adjusted based on needs)
