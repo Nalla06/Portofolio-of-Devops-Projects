@@ -1,33 +1,32 @@
-name: Test Self-Hosted Runner
+name: Deploy Django App to ECS
 
-# Workflow triggers
 on:
   push:
     branches:
       - main  # Trigger on push to the 'main' branch
-  workflow_dispatch:  # Allows manual triggering from the GitHub UI
+    paths:
+      - "Project-03_Django_AWS_ECS_ECR/**"  # Trigger on changes inside this folder
+  workflow_dispatch:  # Allow manual triggering from GitHub UI
 
-# Define the job
 jobs:
-  test-runner:
-    runs-on: [self-hosted, runner1]  # Specify self-hosted and the label for your runner
+  deploy:
+    runs-on: [self-hosted, runner1]  # Specify your self-hosted runner with label 'runner1'
 
     steps:
-      # Step 1: Checkout the repository code
+      # Step 1: Checkout the repository
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2: Print a test message
-      - name: Verify runner is working
-        run: echo "Runner is working correctly!"
+      # Step 2: Set up AWS CLI credentials
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-      # Step 3: Check the system information
-      - name: Print system information
+      # Step 3: Authenticate to Amazon ECR
+      - name: Login to Amazon ECR
         run: |
-          echo "Current User: $(whoami)"
-          echo "Operating System: $(uname -a)"
-          echo "Current Directory: $(pwd)"
+          aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 631172387421.dkr.ecr.us-east-1.amazonaws.com
 
-      # Step 4: Simulate some work (optional)
-      - name: Simulate work
-        run: sleep 10  # Sleep for 10 seconds to mimic a real job
