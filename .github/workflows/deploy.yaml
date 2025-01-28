@@ -29,8 +29,8 @@ jobs:
     # Step 3: Log in to AWS ECR
     - name: Login to Amazon ECR
       run: |
-        aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 631172387421.dkr.ecr.us-east-1.amazonaws.com
-
+        $ecr_password = aws ecr get-login-password --region us-east-1
+        echo $ecr_password | docker login --username AWS --password-stdin 631172387421.dkr.ecr.us-east-1.amazonaws.com
     # Step 4: Build Docker image
     - name: Build Docker image
       run: |
@@ -39,7 +39,7 @@ jobs:
     # Step 5: Tag Docker image
     - name: Tag Docker image
       run: |
-        docker tag django-app:latest 631172387421.dkr.ecr.us-east-1.amazonaws.com/django-app-repo:latest
+        docker tag django-app-repo:latest 631172387421.dkr.ecr.us-east-1.amazonaws.com/django-app-repo:latest
 
     # Step 6: Push Docker image to ECR
     - name: Push Docker image to ECR
