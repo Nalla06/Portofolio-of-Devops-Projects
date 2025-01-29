@@ -26,11 +26,9 @@ jobs:
         aws-region: us-east-1
 
     # Step 3: Log in to AWS ECR
-    - name: Get ECR login password
-      id: ecr-login
+    - name: AWS CLI Login to ECR
       run: |
-        $loginPassword = aws ecr get-login-password --region us-east-1
-        echo $loginPassword | docker login --username AWS --password-stdin 631172387421.dkr.ecr.us-east-1.amazonaws.com
+        aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 631172387421.dkr.ecr.us-east-1.amazonaws.com
       shell: powershell
 
     # Step 4: Build Docker image
