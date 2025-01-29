@@ -31,6 +31,8 @@ jobs:
       run: |
         $loginPassword = aws ecr get-login-password --region us-east-1
         echo $loginPassword | docker login --username AWS --password-stdin 631172387421.dkr.ecr.us-east-1.amazonaws.com
+      shell: pwsh
+      
     # Step 4: Build Docker image
     - name: Build Docker image
       run: |
