@@ -10,12 +10,12 @@ on:
 
 jobs:
   deploy:
-    runs-on: [self-hosted, runner1]
+    runs-on: [self-hosted, windows]
 
     steps:
     # Step 1: Checkout code from GitHub
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v2
 
     # Step 2: Set up AWS CLI
     - name: Set AWS credentials
@@ -29,7 +29,8 @@ jobs:
     - name: Get ECR login password
       id: ecr-login
       run: |
-        aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 631172387421.dkr.ecr.us-east-1.amazonaws.com
+        $loginPassword = aws ecr get-login-password --region us-east-1
+        echo $loginPassword | docker login --username AWS --password-stdin 631172387421.dkr.ecr.us-east-1.amazonaws.com
     # Step 4: Build Docker image
     - name: Build Docker image
       run: |
