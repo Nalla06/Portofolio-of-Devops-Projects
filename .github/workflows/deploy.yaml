@@ -1,5 +1,4 @@
 name: Deploy Django App to ECS
-
 on:
   push:
     branches:
