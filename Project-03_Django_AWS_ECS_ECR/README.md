@@ -74,6 +74,7 @@ Project Workflow
 7. Deploy Application:
     . Verified the app was running by accessing the ALB's public DNS.
 
+![image alt](https://github.com/Nalla06/Portofolio-of-Devops-Projects/blob/ce4b4f1c701b22c8f75e3f06fc5cc988fca28e38/Project-03_Django_AWS_ECS_ECR/Page%20after%20dockefile%20build%20image%20.png)
 
 ### Docker Workflow
 
