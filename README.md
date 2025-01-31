@@ -22,6 +22,23 @@ This project focuses on deploying a Java-based application using an AWS 3-tier a
 
 This project highlights end-to-end deployment using best practices in AWS infrastructure design and DevOps tools.
 
+# Project-03 : Deploying Django App on AWS Fargate using Terraform
+ 
+![AWS](https://imgur.com/a/ZxSC4ZK.png)
+
+### **Project Overview: 
+
+This project demonstrates how to deploy a scalable, production-ready Django application using AWS Fargate and Terraform. The application is containerized with Docker, provisioned on Amazon ECS using Fargate, and connected to a managed PostgreSQL database via AWS RDS. The solution is optimized for scalability, high availability, and security, ensuring the app can handle production traffic with ease.
+
+**Key Features:**
+
+- **Infrastructure as Code**: Provision all AWS resources, including VPC, ECS Cluster, RDS, and ECR, using Terraform.
+- **Containerization**: Build and store the Django app Docker image in AWS ECR for deployment to ECS Fargate.
+- **Database Persistence**: Use AWS RDS to provide managed PostgreSQL database persistence for the Django application.
+- **Secure HTTPS Traffic**: Configure SSL with AWS ACM for a secure HTTPS connection.
+- **Scalability**: Leverage ECS Fargate for serverless container orchestration, ensuring that the application scales seamlessly based on demand.
+- **Efficient Static File Management**: Use Nginx to serve static files, optimizing performance and ensuring a smooth user experience.
+
 # Project-04 :  Java Web App Deployment on Docker Using Jenkins and AWS
 
 ![AWS](https://imgur.com/Hk28ffE.png)

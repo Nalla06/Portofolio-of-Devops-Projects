@@ -1,0 +1,52 @@
+name: Deploy Django App to ECS
+
+on:
+  push:
+    branches:
+      - main  # Trigger the workflow on push to the 'main' branch
+      
+    #paths:
+      - "Project-03_Django_AWS_ECS_ECR/**"  # Trigger on changes to any file inside this folder
+  #workflow_dispatch:  # Allows manual triggering from the GitHub UI
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, runner1]
+
+    steps:
+    # Step 1: Checkout code from GitHub
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    # Step 2: Set up AWS CLI
+    - name: Set AWS credentials
+      run: |
+        echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+        echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+
+    # Step 3: Log in to AWS ECR
+    - name: Get ECR login password
+      id: ecr-login
+      run: |
+        $ecrPassword = aws ecr get-login-password --region us-east-1
+        echo $ecrPassword | docker login --username AWS --password-stdin 631172387421.dkr.ecr.us-east-1.amazonaws.com
+    # Step 4: Build Docker image
+    - name: Build Docker image
+      run: |
+        docker build -t django-app ./Project-03_Django_AWS_ECS_ECR
+
+    # Step 5: Tag Docker image
+    - name: Tag Docker image
+      run: |
+        docker tag django-app-repo:latest 631172387421.dkr.ecr.us-east-1.amazonaws.com/django-app-repo:latest
+
+    # Step 6: Push Docker image to ECR
+    - name: Push Docker image to ECR
+      run: |
+        docker push 631172387421.dkr.ecr.us-east-1.amazonaws.com/django-app-repo:latest
+
+    # Step 7: Update ECS Service with new image
+    - name: Update ECS service
+      run: |
+        aws ecs update-service --cluster django-cluster --service django-service --force-new-deployment

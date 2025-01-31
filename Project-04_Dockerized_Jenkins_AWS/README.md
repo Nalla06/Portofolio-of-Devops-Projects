@@ -15,6 +15,8 @@
 
 #### Agenda
 
+![AWS](https://imgur.com/a/ZxSC4ZK.png)
+
 The project aims to automate the deployment of a Java web application as a Docker container on an EC2 instance using Jenkins. Below are the key steps achieved in this project:
 
 1. Setup Jenkins

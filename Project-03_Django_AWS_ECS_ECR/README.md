@@ -10,11 +10,34 @@ This project demonstrates how to deploy a Django-based application onto AWS usin
 * Django
 * Background on Docker
 * AWS Account
-* Creativity is always a plus 😃
+* Python
+ -->
+
 
 ## Django Web Framework
 
 ***Django is a high-level Python web framework that encourages rapid development and clean, pragmatic design. It is free and open-source, has a thriving and active community, great documentation, and many free and paid-for support options. It uses HTML/CSS/Javascript for the frontend and python for the backend.***
+
+## Steps Followed
+
+1. **Terraform Setup**: Initialize Terraform to manage AWS infrastructure as code. Use Terraform to provision VPC, ECS Cluster, ALB, RDS, IAM Roles, and ECR repository.
+  
+2. **ECR**: Create an ECR repository to store the Docker image of the Django app, build the image, and push it to ECR for deployment.
+
+3. **ECS & Fargate**: Deploy the Django app on AWS Fargate using ECS, configured with the Docker image from ECR, ensuring scalability and serverless compute.
+
+4. **RDS**: Set up AWS RDS for PostgreSQL to handle the database persistence, and configure the Django app to connect to RDS.
+
+5. **Health Checks**: Implement health checks for the application using the ALB to monitor ECS task health.
+
+6. **Custom Domain & SSL**: Configure Route 53 for domain registration, generate an SSL certificate with ACM, and secure the app with HTTPS.
+
+7. **Nginx**: Use Nginx for serving static files and as a reverse proxy to the Django app for optimized performance.
+
+8. **Static Files**: Manage static files efficiently using Nginx or an S3 bucket, ensuring better user experience and app performance.
+
+9. **Allowed Hosts**: Update Django’s `ALLOWED_HOSTS` setting to secure the app from HTTP Host header attacks.
+
 
 Here is a complete Terraform configuration for automating the deployment of a Django application using AWS ECS and ECR.
 
@@ -26,10 +49,12 @@ This setup includes the following resources:
 3. ECS Task Definition for container orchestration.
 4. ECS Service to manage the application scaling and deployment.
 5. Application Load Balancer (ALB) to route traffic to ECS tasks.
-
+https://imgur.com/a/CHpcV02
 ## What are Dockers and Containers?
 
 ![Docker](https://imgur.com/raGErLx.png)
+
+![AWS](https://imgur.com/a/ZxSC4ZK.png)
 
 Project Workflow
 1. Set Up a VPC:

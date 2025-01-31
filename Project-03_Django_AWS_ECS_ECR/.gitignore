@@ -3,3 +3,6 @@
 *.tfstate.backup
 .terraform/
 .terraform.lock.hcl
+__pycache__
+.DS_Store
+*.sqlite3

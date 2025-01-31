@@ -1,10 +1,9 @@
-# Security Group for ECS Tasks
-resource "aws_security_group" "ecs_sg" {
-  name        = "ecs-task-sg"
-  description = "Security group for ECS tasks"
-  vpc_id      = aws_vpc.django_vpc.id
+# ALB Security Group (Traffic Internet -> ALB)
+resource "aws_security_group" "load-balancer" {
+  name        = "load_balancer_security_group"
+  description = "Controls access to the ALB"
+  vpc_id      = aws_vpc.production-vpc.id
 
-  # Allow inbound HTTP traffic (port 80) to the ECS tasks
   ingress {
     from_port   = 80
     to_port     = 80
@@ -12,69 +11,72 @@ resource "aws_security_group" "ecs_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow all outbound traffic (can be adjusted based on needs)
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "ecs-task-sg"
-  }
-}
-
-# Security Group for ALB (Application Load Balancer)
-resource "aws_security_group" "alb_sg" {
-  name        = "alb-sg"
-  description = "Security group for ALB"
-  vpc_id      = aws_vpc.django_vpc.id
-
-  # Allow inbound HTTP traffic (port 80) to the ALB
   ingress {
-    from_port   = 80
-    to_port     = 80
+    from_port   = 443
+    to_port     = 443
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Allow all outbound traffic (can be adjusted based on needs)
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "alb-sg"
   }
 }
 
-# Security Group for the ECS Service (allowing ALB to communicate with ECS tasks)
-resource "aws_security_group" "ecs_service_sg" {
-  name        = "ecs-service-sg"
-  description = "Security group for ECS service"
-  vpc_id      = aws_vpc.django_vpc.id
+# ECS Fargate Security group (traffic ALB -> ECS Fargate Tasks)
+resource "aws_security_group" "ecs-fargate" {
+  name        = "ecs_fargate_security_group"
+  description = "Allows inbound access from the ALB only"
+  vpc_id      = aws_vpc.production-vpc.id
 
-  # Allow inbound HTTP traffic (port 80) from ALB to ECS tasks
   ingress {
-    from_port        = 80
-    to_port          = 80
-    protocol         = "tcp"
-    security_groups  = [aws_security_group.alb_sg.id]
+    from_port       = 0
+    to_port         = 0
+    protocol        = "-1"
+    security_groups = [aws_security_group.load-balancer.id]
   }
 
-  # Allow outbound traffic (can be adjusted based on needs)
+  # No SSH ingress rule since Fargate tasks are abstracted and not directly accessible via SSH
+
   egress {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+}
+# RDS Security Group (traffic Fargate -> RDS)
+resource "aws_security_group" "rds" {
+  name        = "rds-security-group"
+  description = "Allows inbound access from Fargate only"
+  vpc_id      = aws_vpc.production-vpc.id
 
-  tags = {
-    Name = "ecs-service-sg"
+  ingress {
+    protocol        = "tcp"
+    from_port       = "5432"
+    to_port         = "5432"
+    security_groups = [aws_security_group.ecs-fargate.id]
+  }
+
+  egress {
+    protocol    = "-1"
+    from_port   = 0
+    to_port     = 0
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+}
+resource "aws_security_group" "efs_sg" {
+  name        = "EFS Security Group"
+  description = "Allow ECS to EFS communication"
+  vpc_id      = aws_vpc.production-vpc.id
+
+  ingress {
+    from_port   = 2049  # NFS port
+    to_port     = 2049
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"] # Modify this based on your security requirements
   }
 }
