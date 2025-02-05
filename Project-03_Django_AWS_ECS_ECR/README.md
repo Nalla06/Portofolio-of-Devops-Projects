@@ -155,41 +155,41 @@ Here is a complete Terraform configuration for automating the deployment of a Dj
 
 ###  Next, we will configure the following AWS resources using Terraform:
 
-. VPC
+1. VPC
   Create a Virtual Private Cloud (VPC) to host your resources.
 
-. Public and Private Subnets
+2. Public and Private Subnets
   Define both public and private subnets to segregate your resources based on access levels.
 
-. Routing Tables
+3. Routing Tables
   Set up routing tables for directing traffic to appropriate destinations.
 
-. Internet Gateway
+4. Internet Gateway
   Attach an Internet Gateway to the VPC to enable internet access for resources in the public subnet.
 
-. Security Groups
+5. Security Groups
   Configure security groups for controlling access to instances within the VPC.
 
-. Load Balancers, Listeners, and Target Groups
+6. Load Balancers, Listeners, and Target Groups
   Set up an Application Load Balancer (ALB) with listeners and target groups to manage incoming traffic.
 
-. IAM Roles and Policies
+7. IAM Roles and Policies
   Create IAM roles and policies to grant permissions for ECS, ECR, and other AWS resources.
 
 ## ECS Resources
-. Task Definition (with multiple containers)
+8. Task Definition (with multiple containers)
   Define ECS task definitions for multiple containers that will run within ECS tasks.
 
-. Cluster
+9. Cluster
   Create an ECS cluster to house your ECS services.
 
-. Service
+10. Service
   Create ECS services that define how tasks will be deployed and maintained.
 
-. Health Checks and Logs
+11. Health Checks and Logs
   Configure health checks for the ECS tasks and set up logging to monitor the health of your resources.
 ## Monitoring and Logging
-. Logs
+12. Logs
   Configure CloudWatch Logs to capture application and infrastructure logs for better observability.
 
 
