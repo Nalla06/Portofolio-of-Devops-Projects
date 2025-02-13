@@ -68,7 +68,7 @@
       until: result.status == 200
 
     - name: Retrieve Jenkins initial admin password
-      command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      command: sudo cat /var/lib/jenkins/secrets/initialAdminPassword
       register: initial_password
       changed_when: false
 
