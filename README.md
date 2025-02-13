@@ -85,3 +85,22 @@ This method involves manually building and deploying the app using Docker to con
 ## Type 2: Automated Deployment with Terraform
 
 In this method, Terraform is used to automate the entire deployment process, including the creation of VPC, EKS cluster, and the Kubernetes resources necessary for the game app.
+
+
+# Project-10 Super Mario Game Deployment on AWS EKS
+
+
+![supermario](https://imgur.com/rC4Qe8g.png)
+
+
+## **Overview**
+
+This project automates the deployment of the Super Mario game on an AWS EKS cluster using **Terraform, Ansible, and Jenkins**. The workflow provisions an EC2 instance, sets up an EKS cluster, and deploys the containerized Super Mario game on Kubernetes.
+
+## **Project Architecture**
+
+1. **Terraform** provisions an AWS EC2 instance and an EKS cluster.
+2. **Ansible** installs necessary tools (AWS CLI, Terraform, kubectl, Helm) on EC2.
+3. **Terraform** creates EKS cluster and provisions worker nodes.
+4. **Kubernetes** deploys the Super Mario game using a YAML configuration.
+5. **Jenkins** automates the entire process.
