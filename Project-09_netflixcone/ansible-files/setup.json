@@ -1,0 +1,5 @@
+{
+    "installPlugins": true,
+    "adminPassword": "{{ initial_password.stdout }}"
+  }
+  

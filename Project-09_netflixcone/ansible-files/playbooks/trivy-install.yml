@@ -1,0 +1,31 @@
+---
+- name: Install Trivy on EC2 instance
+  hosts: ubuntu_instance
+  become: true
+  tasks:
+    - name: Update apt package index
+      apt:
+        update_cache: yes
+
+    - name: Install dependencies
+      apt:
+        name:
+          - curl
+          - apt-transport-https
+          - gnupg
+        state: present
+
+    - name: Download and install Trivy
+      shell: |
+        curl -sfL https://github.com/aquasecurity/trivy/releases/download/v0.29.0/trivy_0.29.0_Linux-64bit.deb -o trivy.deb
+        sudo dpkg -i trivy.deb
+      args:
+        creates: /usr/local/bin/trivy
+
+    - name: Verify Trivy installation
+      command: trivy --version
+      register: trivy_version
+
+    - name: Display Trivy version
+      debug:
+        msg: "Trivy installed: {{ trivy_version.stdout }}"

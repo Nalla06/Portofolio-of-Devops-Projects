@@ -1,0 +1,9 @@
+export PS1='\u@\h:\W$ '
+source ~/.bashrc
+ansible-playbook create_ec2.yml
+ansible-playbook terminate_ec2.yml
+wsl ansible-playbook /mnt/c/Users/YourUsername/ansible/playbooks/example.yml
+sudo rm -rf /etc/ansible/facts.d/*
+ansible-playbook -i inventory.ini playbooks/docker-install.yml
+ansible-playbook -i inventory.ini playbooks/prometheus-install.yml --f
+lush-cache --limit monitoring_server
