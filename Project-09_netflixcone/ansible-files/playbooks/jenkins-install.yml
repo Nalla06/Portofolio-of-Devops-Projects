@@ -1,110 +1,63 @@
 ---
 - name: Install and Configure Jenkins on Ubuntu 22.04
-  hosts: ubuntu_instance
+  hosts: jenkins-EC2
   become: yes
+
   tasks:
-    - name: Update apt package index
+    - name: Install Java
       apt:
+        name: openjdk-11-jdk
+        state: present
         update_cache: yes
 
-    - name: Install Java (Jenkins dependency)
-      apt:
-        name: openjdk-17-jdk
+    - name: Add Jenkins GPG key
+      apt_key:
+        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
         state: present
 
-    - name: Add Jenkins repository key
-      ansible.builtin.get_url:
-        url: https://pkg.jenkins.io/debian/jenkins.io.key
-        dest: /usr/share/keyrings/jenkins-keyring.asc
-        mode: '0644'
-
     - name: Add Jenkins repository
-      ansible.builtin.apt_repository:
-        repo: "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc] http://pkg.jenkins.io/debian-stable binary/"
+      apt_repository:
+        repo: deb https://pkg.jenkins.io/debian-stable binary/
         state: present
         filename: jenkins
 
-    - name: Update apt package index after adding repository
+    - name: Install required packages
       apt:
-        update_cache: yes
-
-    - name: Install Jenkins
-      apt:
-        name: jenkins
+        name: "{{ item }}"
         state: present
+        update_cache: yes
+      loop:
+        - git
+        - maven
+        - jenkins
 
-    - name: Ensure Jenkins war file exists
-      stat:
-        path: /usr/share/jenkins/jenkins.war
-      register: jenkins_war
-
-    - name: Download Jenkins war file if missing
-      get_url:
-        url: "https://get.jenkins.io/war/latest/jenkins.war"
-        dest: /usr/share/jenkins/jenkins.war
-        mode: '0755'
-      when: not jenkins_war.stat.exists
-
-    - name: Start and enable Jenkins service
-      systemd:
+    - name: Start Jenkins service
+      service:
         name: jenkins
         state: started
         enabled: yes
 
-    # Step 6: Ensure setup.json file exists on the server
-    - name: Copy setup.json to the Jenkins server
-      copy:
-        src: /home/nalla/Portofolio-of-Devops-Projects/Project-09_netflixcone/ansible-files/setup.json
-        dest: /tmp/setup.json
-
-
     - name: Wait for Jenkins to start
-      uri:
-        url: http://localhost:8080
-        status_code: 200
-      register: result
-      retries: 10
-      delay: 5
-      until: result.status == 200
+      wait_for:
+        port: 8080
+        timeout: 60
 
-    - name: Retrieve Jenkins initial admin password
-      command: sudo cat /var/lib/jenkins/secrets/initialAdminPassword
-      register: initial_password
+    - name: Get initial admin password
+      command: cat /var/lib/jenkins/secrets/initialAdminPassword
+      register: jenkins_password
       changed_when: false
 
-    - name: Show initial admin password
+    - name: Ensure playbooks directory exists
+      file:
+        path: /home/nalla/Portofolio-of-Devops-Projects/Project-09_netflixcone/ansible-files/playbooks
+        state: directory
+        mode: '0755'
+
+    - name: Write Jenkins initial admin password to file
+      copy:
+        content: "{{ jenkins_password.stdout }}"
+        dest: /home/nalla/Portofolio-of-Devops-Projects/Project-09_netflixcone/ansible-files/playbooks/jenkins_password.txt
+
+    - name: Display Jenkins initial admin password
       debug:
-        msg: "Initial Jenkins admin password is {{ initial_password.stdout }}"
-
-    - name: Automate Jenkins setup using the initial admin password
-      uri:
-        url: http://localhost:8080/setupWizard
-        method: POST
-        body: "{{ lookup('file', 'setup.json') }}"
-        headers:
-          Content-Type: "application/json"
-        status_code: 200
-        user: admin
-        password: "{{ initial_password.stdout }}"
-
-    - name: Install Jenkins plugins (optional)
-      uri:
-        url: http://localhost:8080/pluginManager/installNecessaryPlugins
-        method: POST
-        body: "{{ lookup('file', 'plugins.json') }}"
-        headers:
-          Content-Type: "application/json"
-        status_code: 200
-        user: admin
-        password: "{{ initial_password.stdout }}"
-
-    - name: Set up Jenkins admin user (optional)
-      uri:
-        url: http://localhost:8080/securityRealm/createAccount
-        method: POST
-        body: '{"username": "admin", "password1": "admin123", "password2": "admin123"}'
-        headers:
-          Content-Type: "application/json"
-        status_code: 200
-        user: admin
-        password: "{{ initial_password.stdout }}"
+        var: jenkins_password.stdout

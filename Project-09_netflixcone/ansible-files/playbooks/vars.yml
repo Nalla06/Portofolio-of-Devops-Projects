@@ -1,0 +1,33 @@
+---
+# Jenkins Configuration
+jenkins_admin_username: "admin"
+jenkins_admin_password: "admin"  # The initial admin password
+jenkins_url: "http://localhost:8080"  # URL for Jenkins instance
+
+# SonarQube Configuration
+sonar_host: "44.200.61.179"
+sonar_token: "squ_f9210b59a449eabcb957b7fb1dd8d4950f77abf7"  # Get this from SonarQube server -> Administration -> Security -> Users -> Tokens
+
+# Docker Hub Configuration
+docker_hub_username: "nalla06"
+docker_hub_password: "kondapalli"
+
+# Email Configuration (for Gmail)
+email_address: "lakshmi.rajyam06@gmail.com"
+email_password: "ybwb tjxf aiei fjpq"  # App password generated from Google Account settings
+
+# Kubernetes Configuration (if you're using K8s)
+k8s_master_ip: "your-k8s-master-ip"
+k8s_worker_ip: "your-k8s-worker-ip"
+
+# Prometheus Configuration
+prometheus_port: "9090"
+node_exporter_port: "9100"
+
+grafana_password: "admin"
+grafana_port: "3000"
+grafana_domain: "http://44.200.61.179:3000"
+
+# Prometheus Configuration (already existing, but important for Grafana)
+prometheus_url: "http://localhost:9090"
+prometheus_port: "9090"

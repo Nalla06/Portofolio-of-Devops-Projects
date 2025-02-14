@@ -1,0 +1,108 @@
+---
+- name: Initialize Jenkins and Handle Authentication
+  hosts: jenkins-EC2
+  become: yes
+  vars:
+    jenkins_url: "http://localhost:8080"
+    jenkins_home: "/var/lib/jenkins"
+    
+  tasks:
+    - name: Ensure Jenkins service is running 
+      systemd:
+        name: jenkins
+        state: started
+        enabled: yes
+
+    - name: Wait for Jenkins to start up
+      wait_for:
+        port: 8080
+        timeout: 300
+
+    - name: Check if initial admin password file exists
+      stat:
+        path: "{{ jenkins_home }}/secrets/initialAdminPassword"
+      register: password_file
+
+    - name: Get initial admin password
+      slurp:
+        src: "{{ jenkins_home }}/secrets/initialAdminPassword"
+      register: admin_password
+      when: password_file.stat.exists
+      
+    - name: Set admin password fact
+      set_fact:
+        jenkins_initial_password: "{{ admin_password.content | b64decode | trim }}"
+      when: password_file.stat.exists
+
+    - name: Download Jenkins CLI
+      get_url:
+        url: "{{ jenkins_url }}/jnlpJars/jenkins-cli.jar"
+        dest: /tmp/jenkins-cli.jar
+        mode: '0755'
+      register: cli_download
+      retries: 30
+      delay: 10
+      until: cli_download is success
+      ignore_errors: yes
+
+    - name: Create groovy script for basic auth setup
+      copy:
+        dest: /tmp/basic-security.groovy
+        content: |
+          #!groovy
+          import jenkins.model.*
+          import hudson.security.*
+          
+          def instance = Jenkins.getInstance()
+          
+          println "Creating local user 'admin'"
+          
+          def hudsonRealm = new HudsonPrivateSecurityRealm(false)
+          hudsonRealm.createAccount('admin', 'admin123')
+          instance.setSecurityRealm(hudsonRealm)
+          
+          def strategy = new FullControlOnceLoggedInAuthorizationStrategy()
+          strategy.setAllowAnonymousRead(false)
+          instance.setAuthorizationStrategy(strategy)
+          
+          instance.save()
+          
+    - name: Execute groovy script
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} \
+          -auth admin:{{ jenkins_initial_password }} \
+          groovy = < /tmp/basic-security.groovy
+      register: groovy_result
+      ignore_errors: yes
+
+    - name: Restart Jenkins to apply changes
+      systemd:
+        name: jenkins
+        state: restarted
+      when: groovy_result is success
+
+    - name: Wait for Jenkins to become available after restart
+      uri:
+        url: "{{ jenkins_url }}/login"
+        status_code: 200
+        validate_certs: no
+      register: jenkins_status
+      retries: 30
+      delay: 10
+      until: jenkins_status.status == 200
+      ignore_errors: yes
+
+    - name: Final Jenkins status check
+      uri:
+        url: "{{ jenkins_url }}/api/json"
+        user: admin
+        password: admin123
+        force_basic_auth: yes
+        status_code: 200
+      register: final_check
+      ignore_errors: yes
+
+    - name: Display Jenkins status
+      debug:
+        msg: "Jenkins is now accessible with username: admin and password: admin123"
+      when: final_check is success

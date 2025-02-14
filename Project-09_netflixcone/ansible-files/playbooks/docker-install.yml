@@ -1,6 +1,6 @@
 ---
 - name: Install Docker on EC2 instance
-  hosts: ubuntu_instance  # Reference to your EC2 instance from inventory file
+  hosts: jenkins-EC2  # Reference to your EC2 instance from inventory file
   become: true  # Elevate privileges to root
   tasks:
     - name: Update apt package index

@@ -1,0 +1,76 @@
+---
+- name: Install Required Jenkins Plugins
+  hosts: jenkins-EC2
+  become: yes
+  vars:
+    jenkins_url: "http://localhost:8080"
+    jenkins_admin_user: "admin"
+    jenkins_admin_password: "admin123"
+    required_plugins:
+      - adoptopenjdk
+      - sonar
+      - nodejs
+      - dependency-check-jenkins-plugin
+      - docker-workflow
+      - kubernetes
+      - pipeline-utility-steps
+      - git
+      - email-ext
+      - docker-plugin
+
+  tasks:
+    - name: Wait for Jenkins to be fully operational
+      uri:
+        url: "{{ jenkins_url }}/login"
+        status_code: 200
+        validate_certs: no
+      register: jenkins_status
+      retries: 30
+      delay: 10
+      until: jenkins_status.status == 200
+
+    - name: Download Jenkins CLI
+      get_url:
+        url: "{{ jenkins_url }}/jnlpJars/jenkins-cli.jar"
+        dest: /tmp/jenkins-cli.jar
+        mode: '0755'
+
+    - name: Get list of installed plugins
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} list-plugins | cut -f 1 -d ' '
+      register: installed_plugins
+      ignore_errors: yes
+
+    - name: Install Jenkins plugins
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} install-plugin {{ item }} -deploy
+      register: plugin_install
+      until: plugin_install.rc == 0
+      retries: 3
+      delay: 15
+      with_items: "{{ required_plugins }}"
+      when: item not in installed_plugins.stdout_lines
+      ignore_errors: yes
+
+    - name: Wait before restart
+      pause:
+        seconds: 30
+      when: plugin_install.changed
+
+    - name: Restart Jenkins
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} safe-restart
+      async: 300
+      poll: 0
+      when: plugin_install.changed
+
+    - name: Wait for Jenkins to become available after restart
+      uri:
+        url: "{{ jenkins_url }}/login"
+        status_code: 200
+        validate_certs: no
+      register: jenkins_status
+      retries: 30
+      delay: 10
+      until: jenkins_status.status == 200
+      when: plugin_install.changed

@@ -1,6 +1,6 @@
 ---
 - name: Run SonarQube container
-  hosts: ubuntu_instance
+  hosts: jenkins-EC2
   become: true
   tasks:
     - name: Pull SonarQube Docker image

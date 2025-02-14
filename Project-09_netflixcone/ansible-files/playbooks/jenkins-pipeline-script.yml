@@ -1,0 +1,406 @@
+---
+- name: Jenkins Pipeline with Docker and Kubernetes Setup
+  hosts: jenkins-EC2
+  become: yes
+  vars:
+    jenkins_url: "http://localhost:8080"
+    jenkins_admin_user: "admin"
+    jenkins_admin_password: "admin123"
+    required_plugins:
+      - adoptopenjdk
+      - sonar
+      - nodejs
+      - dependency-check-jenkins-plugin
+      - docker-workflow
+      - kubernetes
+      - pipeline-utility-steps
+      - git
+      - email-ext
+      - docker-plugin
+      - prometheus
+      - email-ext
+    jenkins_admin_email: "admin@example.com"
+    jenkins_smtp_server: "smtp.example.com"
+    jenkins_smtp_port: 587
+    jenkins_smtp_user: "smtp_user"
+    jenkins_smtp_password: "smtp_password"
+    prometheus_version: "2.30.3"
+    grafana_version: "8.3.3"
+    grafana_user: "admin"
+    grafana_password: "admin123"
+    docker_image_name: "myapp"
+    docker_registry: "myregistry.com"
+    docker_registry_user: "registry_user"
+    docker_registry_password: "registry_password"
+    kubernetes_master_ip: "192.168.1.100"
+    kubernetes_slave_ip: "192.168.1.101"
+
+  tasks:
+    - name: Wait for Jenkins to be fully operational
+      uri:
+        url: "{{ jenkins_url }}/login"
+        status_code: 200
+        validate_certs: no
+      register: jenkins_status
+      retries: 30
+      delay: 10
+      until: jenkins_status.status == 200
+
+    - name: Download Jenkins CLI
+      get_url:
+        url: "{{ jenkins_url }}/jnlpJars/jenkins-cli.jar"
+        dest: /tmp/jenkins-cli.jar
+        mode: '0755'
+
+    - name: Get list of installed plugins
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} list-plugins | cut -f 1 -d ' '
+      register: installed_plugins
+      ignore_errors: yes
+
+    - name: Install Jenkins plugins
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} install-plugin {{ item }} -deploy
+      register: plugin_install
+      until: plugin_install.rc == 0
+      retries: 3
+      delay: 15
+      with_items: "{{ required_plugins }}"
+      when: item not in installed_plugins.stdout_lines
+      ignore_errors: yes
+
+    - name: Wait before restart
+      pause:
+        seconds: 30
+      when: plugin_install.changed
+
+    - name: Restart Jenkins
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} safe-restart
+      async: 300
+      poll: 0
+      when: plugin_install.changed
+
+    - name: Wait for Jenkins to become available after restart
+      uri:
+        url: "{{ jenkins_url }}/login"
+        status_code: 200
+        validate_certs: no
+      register: jenkins_status
+      retries: 30
+      delay: 10
+      until: jenkins_status.status == 200
+      when: plugin_install.changed
+
+    - name: Install Prometheus
+      get_url:
+        url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        dest: /tmp/prometheus.tar.gz
+
+    - name: Extract Prometheus
+      unarchive:
+        src: /tmp/prometheus.tar.gz
+        dest: /opt/
+        remote_src: yes
+
+    - name: Create Prometheus systemd service
+      copy:
+        dest: /etc/systemd/system/prometheus.service
+        content: |
+          [Unit]
+          Description=Prometheus
+          After=network.target
+
+          [Service]
+          User=root
+          ExecStart=/opt/prometheus-{{ prometheus_version }}.linux-amd64/prometheus \
+            --config.file=/opt/prometheus-{{ prometheus_version }}.linux-amd64/prometheus.yml \
+            --storage.tsdb.path=/opt/prometheus-{{ prometheus_version }}.linux-amd64/data
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Start and enable Prometheus service
+      systemd:
+        name: prometheus
+        state: started
+        enabled: yes
+
+    - name: Install Grafana
+      get_url:
+        url: "https://dl.grafana.com/oss/release/grafana-{{ grafana_version }}.linux-amd64.tar.gz"
+        dest: /tmp/grafana.tar.gz
+
+    - name: Extract Grafana
+      unarchive:
+        src: /tmp/grafana.tar.gz
+        dest: /opt/
+        remote_src: yes
+
+    - name: Create Grafana systemd service
+      copy:
+        dest: /etc/systemd/system/grafana.service
+        content: |
+          [Unit]
+          Description=Grafana
+          After=network.target
+
+          [Service]
+          User=root
+          ExecStart=/opt/grafana-{{ grafana_version }}.linux-amd64/bin/grafana-server \
+            --homepath=/opt/grafana-{{ grafana_version }}.linux-amd64
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Start and enable Grafana service
+      systemd:
+        name: grafana
+        state: started
+        enabled: yes
+
+    - name: Integrate Prometheus plugin with Prometheus server
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} groovy = <<EOF
+        import jenkins.model.*
+        import jenkins.metrics.api.MetricsAccessKey
+        import org.jenkinsci.plugins.prometheus.*
+        def j = Jenkins.instance
+        def plugin = j.getPlugin("prometheus")
+        def prometheus = plugin.getPrometheus()
+        prometheus.setPrometheusUrl("http://localhost:9090")
+        j.save()
+        EOF
+
+    - name: Configure Jenkins email settings
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} groovy = <<EOF
+        import jenkins.model.*
+        import hudson.tasks.Mailer
+        def j = Jenkins.instance
+        def mailer = j.getDescriptorByType(Mailer.DescriptorImpl)
+        mailer.setSmtpServer("{{ jenkins_smtp_server }}")
+        mailer.setUseSsl(false)
+        mailer.setSmtpPort("{{ jenkins_smtp_port }}")
+        mailer.setReplyToAddress("{{ jenkins_admin_email }}")
+        mailer.setCharset("UTF-8")
+        mailer.setDefaultSuffix("")
+        mailer.setSmtpAuth("{{ jenkins_smtp_user }}", "{{ jenkins_smtp_password }}")
+        j.save()
+        EOF
+
+    - name: Install additional Jenkins plugins
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} install-plugin jdk-tool sonarqube-scanner nodejs owasp-dependency-check -deploy
+      register: additional_plugin_install
+      until: additional_plugin_install.rc == 0
+      retries: 3
+      delay: 15
+      ignore_errors: yes
+
+    - name: Wait before restart
+      pause:
+        seconds: 30
+      when: additional_plugin_install.changed
+
+    - name: Restart Jenkins
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} safe-restart
+      async: 300
+      poll: 0
+      when: additional_plugin_install.changed
+
+    - name: Wait for Jenkins to become available after restart
+      uri:
+        url: "{{ jenkins_url }}/login"
+        status_code: 200
+        validate_certs: no
+      register: jenkins_status
+      retries: 30
+      delay: 10
+      until: jenkins_status.status == 200
+      when: additional_plugin_install.changed
+
+    - name: Create Jenkins pipeline job
+      shell: |
+        java -jar /tmp/jenkins-cli.jar -s {{ jenkins_url }} -auth {{ jenkins_admin_user }}:{{ jenkins_admin_password }} create-job my-pipeline <<EOF
+        <flow-definition plugin="workflow-job">
+          <actions/>
+          <description>My Pipeline Project</description>
+          <keepDependencies>false</keepDependencies>
+          <properties/>
+          <definition class="org.jenkinsci.plugins.workflow.cps.CpsFlowDefinition" plugin="workflow-cps">
+            <script>
+              pipeline {
+                agent any
+                tools {
+                  jdk 'jdk17'
+                  nodejs 'node16'
+                }
+                environment {
+                  SCANNER_HOME = tool 'sonar-scanner'
+                }
+                stages {
+                  stage('Clean Workspace') {
+                    steps {
+                      cleanWs()
+                    }
+                  }
+                  stage('Checkout from Git') {
+                    steps {
+                      git branch: 'main', url: 'https://github.com/Aj7Ay/Netflix-clone.git'
+                    }
+                  }
+                  stage('SonarQube Analysis') {
+                    steps {
+                      withSonarQubeEnv('sonar-server') {
+                        sh '''
+                          $SCANNER_HOME/bin/sonar-scanner \
+                          -Dsonar.projectName=Netflix \
+                          -Dsonar.projectKey=Netflix
+                        '''
+                      }
+                    }
+                  }
+                  stage('Quality Gate') {
+                    steps {
+                      script {
+                        waitForQualityGate abortPipeline: false, credentialsId: 'Sonar-token'
+                      }
+                    }
+                  }
+                  stage('Install Dependencies') {
+                    steps {
+                      sh 'npm install'
+                    }
+                  }
+                  stage('OWASP Dependency Check') {
+                    steps {
+                      dependencyCheck additionalArguments: '--scan ./ --disableYarnAudit --disableNodeAudit', odcInstallation: 'DP-Check'
+                      dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+                    }
+                  }
+                  stage('TRIVY FS Scan') {
+                    steps {
+                      sh 'trivy fs . > trivyfs.txt'
+                    }
+                  }
+                  stage('Docker Build & Push') {
+                    steps {
+                      script {
+                        withDockerRegistry(credentialsId: 'docker', toolName: 'docker') {
+                          sh 'docker build --build-arg TMDB_V3_API_KEY=Aj7ay86fe14eca3e76869b92 -t netflix .'
+                          sh 'docker tag netflix sevenajay/netflix:latest'
+                          sh 'docker push sevenajay/netflix:latest'
+                        }
+                      }
+                    }
+                  }
+                  stage('TRIVY Image Scan') {
+                    steps {
+                      sh 'trivy image sevenajay/netflix:latest > trivyimage.txt'
+                    }
+                  }
+                  stage('Deploy to Container') {
+                    steps {
+                      sh 'docker run -d --name netflix -p 8081:80 sevenajay/netflix:latest'
+                    }
+                  }
+                  stage('Deploy to Kubernetes') {
+                    steps {
+                      script {
+                        dir('Kubernetes') {
+                          withKubeConfig(caCertificate: '', clusterName: '', contextName: '', credentialsId: 'k8s', namespace: '', restrictKubeConfigAccess: false, serverUrl: '') {
+                            sh 'kubectl apply -f deployment.yml'
+                            sh 'kubectl apply -f service.yml'
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                post {
+                  always {
+                    emailext attachLog: true,
+                      subject: "'${currentBuild.result}'",
+                      body: "Project: ${env.JOB_NAME}<br/>" +
+                            "Build Number: ${env.BUILD_NUMBER}<br/>" +
+                            "URL: ${env.BUILD_URL}<br/>",
+                      to: 'rutik@gmail.com',
+                      attachmentsPattern: 'trivyfs.txt,trivyimage.txt'
+                  }
+                }
+              }
+            </script>
+            <sandbox>true</sandbox>
+          </definition>
+          <triggers/>
+          <disabled>false</disabled>
+        </flow-definition>
+        EOF
+
+    - name: Install Docker
+      apt:
+        name: docker.io
+        state: present
+        update_cache: yes
+
+    - name: Start and enable Docker service
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Install Kubernetes tools
+      shell: |
+        sudo apt-get update
+        sudo apt-get install -y kubelet kubeadm kubectl
+        sudo snap install kube-apiserver
+
+    - name: Setup Kubernetes master node
+      shell: |
+        sudo kubeadm init --pod-network-cidr=10.244.0.0/16
+
+    - name: Setup Kubernetes worker node
+      shell: |
+        sudo kubeadm join {{ kubernetes_master_ip }}:6443 --token <token> --discovery-token-ca-cert-hash <hash>
+
+    - name: Install Node Exporter on master and worker nodes
+      shell: |
+        sudo useradd --system --no-create-home --shell /bin/false node_exporter
+        wget https://github.com/prometheus/node_exporter/releases/download/v1.6.1/node_exporter-1.6.1.linux-amd64.tar.gz
+        tar -xvf node_exporter-1.6.1.linux-amd64.tar.gz
+        sudo mv node_exporter-1.6.1.linux-amd64/node_exporter /usr/local/bin/
+        rm -rf node_exporter*
+        sudo tee /etc/systemd/system/node_exporter.service <<EOF
+        [Unit]
+        Description=Node Exporter
+        Wants=network-online.target
+        After=network-online.target
+        StartLimitIntervalSec=500
+        StartLimitBurst=5
+        [Service]
+        User=node_exporter
+        Group=node_exporter
+        Type=simple
+        Restart=on-failure
+        RestartSec=5s
+        ExecStart=/usr/local/bin/node_exporter --collector.logind
+        [Install]
+        WantedBy=multi-user.target
+        EOF
+        sudo systemctl enable node_exporter
+        sudo systemctl start node_exporter
+
+    - name: Configure Prometheus targets
+      shell: |
+        sudo tee -a /etc/prometheus/prometheus.yml <<EOF
+        - job_name: node_export_masterk8s
+          static_configs:
+            - targets: ["{{ kubernetes_master_ip }}:9100"]
+        - job_name: node_export_workerk8s
+          static_configs:
+            - targets: ["{{ kubernetes_slave_ip }}:9100"]
+        EOF
+        promtool check config /etc/prometheus/prometheus.yml
+        curl -X POST http://localhost:9090/-/reload
