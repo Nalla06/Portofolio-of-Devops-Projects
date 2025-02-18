@@ -23,6 +23,16 @@ jobs:
         with:
           node-version: '16'
 
+      - name: Debug Node.js Setup
+        run: |
+          echo "Checking Node.js version..."
+          node -v || echo "Node.js is not installed"
+          echo "Checking npm version..."
+          npm -v || echo "npm is not installed"
+          echo "Checking file system permissions..."
+          ls -la $(dirname $(which node))
+          ls -la $(dirname $(which npm))
+
       - name: Install dependencies
         working-directory: Project-10_Supermario_game_deployment_AWS_EKS
         run: npm install
