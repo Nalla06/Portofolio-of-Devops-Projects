@@ -22,16 +22,22 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: '16'
+        continue-on-error: true
 
       - name: Debug Node.js Setup
+        if: failure()
         run: |
+          echo "Node.js setup failed. Checking environment..."
+          echo "Listing current directory:"
+          ls -la
           echo "Checking Node.js version..."
           node -v || echo "Node.js is not installed"
           echo "Checking npm version..."
           npm -v || echo "npm is not installed"
-          echo "Checking file system permissions..."
-          ls -la $(dirname $(which node))
-          ls -la $(dirname $(which npm))
+          echo "Checking file permissions in actions-runner directory..."
+          ls -la C:\Windows\System32\actions-runner\_work\_actions\actions\setup-node\v2\externals
+          echo "Checking available disk space..."
+          df -h
 
       - name: Install dependencies
         working-directory: Project-10_Supermario_game_deployment_AWS_EKS
