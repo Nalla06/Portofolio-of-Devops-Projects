@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   check-environment:
-    runs-on: windows-latest
+    runs-on: self-hosted
 
     steps:
     - name: Checkout repository
@@ -15,6 +15,11 @@ jobs:
       with:
         node-version: '16'
 
+    - name: List files in the working directory
+      run: Get-ChildItem -Path ${{ github.workspace }} -Recurse
+      shell: pwsh
+
     - name: Check environment
       run: .\check-environment.ps1
       shell: pwsh
+      working-directory: ${{ github.workspace }}
