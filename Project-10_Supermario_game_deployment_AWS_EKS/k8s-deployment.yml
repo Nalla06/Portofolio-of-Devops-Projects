@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supermario-game
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: supermario-game
+  template:
+    metadata:
+      labels:
+        app: supermario-game
+    spec:
+      containers:
+      - name: supermario-game
+        image: <ECR_REPOSITORY_URI>:latest
+        ports:
+        - containerPort: 3000

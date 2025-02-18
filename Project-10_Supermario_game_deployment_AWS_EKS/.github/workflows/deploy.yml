@@ -1,0 +1,61 @@
+name: Deploy Super Mario Game to EKS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: supermario-game
+      CLUSTER_NAME: super-mario-eks
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: Initialize Terraform
+        run: terraform init
+
+      - name: Apply Terraform
+        run: terraform apply -auto-approve
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build Docker image
+        run: docker build -t ${{ env.ECR_REPOSITORY }} .
+
+      - name: Tag Docker image
+        run: docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Push Docker image to ECR
+        run: docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Update Kubernetes deployment
+        run: |
+          kubectl apply -f k8s-deployment.yml
+          kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
