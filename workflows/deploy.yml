@@ -24,15 +24,18 @@ jobs:
           node-version: '16'
 
       - name: Install dependencies
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS
         run: npm install
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
 
       - name: Initialize Terraform
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/terraform
         run: terraform init
 
       - name: Apply Terraform
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/terraform
         run: terraform apply -auto-approve
 
       - name: Configure AWS credentials
@@ -47,15 +50,19 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build Docker image
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/docker
         run: docker build -t ${{ env.ECR_REPOSITORY }} .
 
       - name: Tag Docker image
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/docker
         run: docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Push Docker image to ECR
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/docker
         run: docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Update Kubernetes deployment
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/k8s
         run: |
           kubectl apply -f k8s-deployment.yml
           kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
