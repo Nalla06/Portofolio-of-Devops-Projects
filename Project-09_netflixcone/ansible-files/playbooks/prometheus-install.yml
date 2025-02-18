@@ -1,136 +1,181 @@
 ---
-- name: Install and Configure Prometheus & Node Exporter
-  hosts: monitoring_server
-  become: true
-  vars:
-    prometheus_version: "3.1.0"
-    node_exporter_version: "1.6.1"
+# Tasks to install and configure Prometheus & Node Exporter
+- name: Create Prometheus system user
+  user:
+    name: prometheus
+    system: true
+    shell: /bin/false
 
-  tasks:
-    ## ----------------- Prometheus Setup ----------------- ##
-    - name: Create Prometheus system user
-      user:
-        name: prometheus
-        system: true
-        shell: /bin/false
+- name: Ensure required directories exist
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: prometheus
+    group: prometheus
+    mode: '0755'
+  loop:
+    - /etc/prometheus
+    - /var/lib/prometheus
+    - /opt/prometheus
 
-    - name: Ensure required directories exist
-      file:
-        path: "{{ item }}"
-        state: directory
-        owner: prometheus
-        group: prometheus
-        mode: '0755'
-      loop:
-        - /etc/prometheus
-        - /var/lib/prometheus
-        - /opt/prometheus
+- name: Download Prometheus
+  get_url:
+    url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
 
-    - name: Download Prometheus
-      get_url:
-        url: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
-        dest: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+- name: Extract Prometheus
+  unarchive:
+    src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+    dest: /opt/prometheus
+    remote_src: true
+    extra_opts: [--strip-components=1]
 
-    - name: Extract Prometheus
-      unarchive:
-        src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
-        dest: /opt/prometheus
-        remote_src: true
-        extra_opts: [--strip-components=1]
+- name: Move Prometheus binaries
+  command:
+    cmd: "mv /opt/prometheus/prometheus /opt/prometheus/promtool /usr/local/bin/"
+    creates: /usr/local/bin/prometheus
 
-    - name: Move Prometheus binaries
-      command:
-        cmd: "mv /opt/prometheus/prometheus /opt/prometheus/promtool /usr/local/bin/"
-        creates: /usr/local/bin/prometheus
+- name: Move Prometheus configuration file
+  command:
+    cmd: "mv /opt/prometheus/prometheus.yml /etc/prometheus/prometheus.yml"
+    creates: /etc/prometheus/prometheus.yml
 
-    - name: Move Prometheus configuration file
-      command:
-        cmd: "mv /opt/prometheus/prometheus.yml /etc/prometheus/prometheus.yml"
-        creates: /etc/prometheus/prometheus.yml
+- name: Create Prometheus systemd service
+  copy:
+    dest: /etc/systemd/system/prometheus.service
+    content: |
+      [Unit]
+      Description=Prometheus
+      Wants=network-online.target
+      After=network-online.target
 
-    - name: Create Prometheus systemd service
-      copy:
-        dest: /etc/systemd/system/prometheus.service
-        content: |
-          [Unit]
-          Description=Prometheus
-          Wants=network-online.target
-          After=network-online.target
+      [Service]
+      User=prometheus
+      Group=prometheus
+      Type=simple
+      Restart=on-failure
+      RestartSec=5s
+      ExecStart=/usr/local/bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/var/lib/prometheus \
+        --web.listen-address=0.0.0.0:9090 \
+        --web.enable-lifecycle
 
-          [Service]
-          User=prometheus
-          Group=prometheus
-          Type=simple
-          Restart=on-failure
-          RestartSec=5s
-          ExecStart=/usr/local/bin/prometheus \
-            --config.file=/etc/prometheus/prometheus.yml \
-            --storage.tsdb.path=/var/lib/prometheus \
-            --web.listen-address=0.0.0.0:9090 \
-            --web.enable-lifecycle
+      [Install]
+      WantedBy=multi-user.target
+    owner: root
+    group: root
+    mode: '0644'
 
-          [Install]
-          WantedBy=multi-user.target
-        owner: root
-        group: root
-        mode: '0644'
+- name: Reload systemd and enable Prometheus service
+  systemd:
+    daemon_reload: true
+    name: prometheus
+    enabled: true
+    state: started
 
-    - name: Reload systemd and enable Prometheus service
-      systemd:
-        daemon_reload: true
-        name: prometheus
-        enabled: true
-        state: started
+- name: Create Node Exporter system user
+  user:
+    name: node_exporter
+    system: true
+    shell: /bin/false
 
-    ## ----------------- Node Exporter Setup ----------------- ##
-    - name: Create Node Exporter system user
-      user:
-        name: node_exporter
-        system: true
-        shell: /bin/false
+- name: Download Node Exporter
+  get_url:
+    url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
 
-    - name: Download Node Exporter
-      get_url:
-        url: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
-        dest: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+- name: Extract Node Exporter
+  unarchive:
+    src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+    dest: /opt/
+    remote_src: true
 
-    - name: Extract Node Exporter
-      unarchive:
-        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
-        dest: /opt/
-        remote_src: true
+- name: Move Node Exporter binary
+  command:
+    cmd: mv /opt/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter /usr/local/bin/
+    creates: /usr/local/bin/node_exporter
 
-    - name: Move Node Exporter binary
-      command:
-        cmd: mv /opt/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter /usr/local/bin/
-        creates: /usr/local/bin/node_exporter
+- name: Create Node Exporter systemd service
+  copy:
+    dest: /etc/systemd/system/node_exporter.service
+    content: |
+      [Unit]
+      Description=Node Exporter
+      Wants=network-online.target
+      After=network-online.target
 
-    - name: Create Node Exporter systemd service
-      copy:
-        dest: /etc/systemd/system/node_exporter.service
-        content: |
-          [Unit]
-          Description=Node Exporter
-          Wants=network-online.target
-          After=network-online.target
+      [Service]
+      User=node_exporter
+      Group=node_exporter
+      Type=simple
+      Restart=on-failure
+      RestartSec=5s
+      ExecStart=/usr/local/bin/node_exporter
 
-          [Service]
-          User=node_exporter
-          Group=node_exporter
-          Type=simple
-          Restart=on-failure
-          RestartSec=5s
-          ExecStart=/usr/local/bin/node_exporter
+      [Install]
+      WantedBy=multi-user.target
+    owner: root
+    group: root
+    mode: '0644'
 
-          [Install]
-          WantedBy=multi-user.target
-        owner: root
-        group: root
-        mode: '0644'
+- name: Reload systemd and enable Node Exporter service
+  systemd:
+    daemon_reload: true
+    name: node_exporter
+    enabled: true
+    state: started
 
-    - name: Reload systemd and enable Node Exporter service
-      systemd:
-        daemon_reload: true
-        name: node_exporter
-        enabled: true
-        state: started
+- name: Update Prometheus configuration file with scrape targets
+  copy:
+    dest: /etc/prometheus/prometheus.yml
+    content: |
+      global:
+        scrape_interval: 15s
+
+      scrape_configs:
+        # Jenkins Metrics
+        - job_name: 'jenkins'
+          static_configs:
+            - targets: ['{{ prometheus_targets[0] }}']
+          metrics_path: '/prometheus'
+          scheme: http
+
+        # Node Exporter Metrics
+        - job_name: 'node_exporter'
+          static_configs:
+            - targets: ['{{ prometheus_targets[1] }}']
+
+        # Kubernetes Node Metrics
+        - job_name: 'kubernetes-nodes'
+          kubernetes_sd_configs:
+            - role: node
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_node_name]
+              target_label: node
+
+        # Kubernetes Pod Metrics
+        - job_name: 'kubernetes-pods'
+          kubernetes_sd_configs:
+            - role: pod
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_pod_name]
+              target_label: pod_name
+            - source_labels: [__meta_kubernetes_namespace]
+              target_label: namespace
+
+        # Kubernetes API Server Metrics
+        - job_name: 'kubernetes-api-server'
+          kubernetes_sd_configs:
+            - role: apiserver
+          relabel_configs:
+            - source_labels: [__meta_kubernetes_endpoint_name]
+              target_label: endpoint
+    owner: prometheus
+    group: prometheus
+    mode: '0644'
+
+- name: Reload Prometheus to apply configuration changes
+  systemd:
+    name: prometheus
+    state: restarted

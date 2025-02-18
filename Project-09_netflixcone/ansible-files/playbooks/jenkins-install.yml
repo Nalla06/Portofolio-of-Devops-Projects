@@ -1,63 +1,90 @@
 ---
-- name: Install and Configure Jenkins on Ubuntu 22.04
-  hosts: jenkins-EC2
-  become: yes
+# jenkins-install-direct.yml - Uses direct download instead of apt repository
+- name: Update apt package index
+  apt:
+    update_cache: yes
+  register: apt_update
+  retries: 5
+  delay: 10
+  until: apt_update is success
+  ignore_errors: yes
 
-  tasks:
-    - name: Install Java
-      apt:
-        name: openjdk-11-jdk
-        state: present
-        update_cache: yes
+- name: Install Java and other dependencies
+  apt:
+    name:
+      - openjdk-11-jdk
+      - wget
+      - gnupg
+      - apt-transport-https
+      - ca-certificates
+    state: present
+  register: deps_install
+  retries: 3
+  delay: 5
+  until: deps_install is success
 
-    - name: Add Jenkins GPG key
-      apt_key:
-        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-        state: present
+- name: Download Jenkins deb package
+  get_url:
+    url: https://pkg.jenkins.io/debian-stable/binary/jenkins_2.361.4_all.deb
+    dest: /tmp/jenkins.deb
+    mode: '0644'
+  register: jenkins_download
+  retries: 3
+  delay: 10
+  until: jenkins_download is success
 
-    - name: Add Jenkins repository
-      apt_repository:
-        repo: deb https://pkg.jenkins.io/debian-stable binary/
-        state: present
-        filename: jenkins
+- name: Install Jenkins from deb package
+  apt:
+    deb: /tmp/jenkins.deb
+    state: present
+  register: jenkins_install
 
-    - name: Install required packages
-      apt:
-        name: "{{ item }}"
-        state: present
-        update_cache: yes
-      loop:
-        - git
-        - maven
-        - jenkins
+- name: Install any missing dependencies
+  apt:
+    name: -f
+    state: present
+  when: jenkins_install is failed
 
-    - name: Start Jenkins service
-      service:
-        name: jenkins
-        state: started
-        enabled: yes
+- name: Install Jenkins again if dependency install was needed
+  apt:
+    deb: /tmp/jenkins.deb
+    state: present
+  when: jenkins_install is failed
+  register: jenkins_install_retry
 
-    - name: Wait for Jenkins to start
-      wait_for:
-        port: 8080
-        timeout: 60
+- name: Ensure Jenkins is started and enabled
+  systemd:
+    name: jenkins
+    enabled: yes
+    state: started
+  register: jenkins_service
+  ignore_errors: yes
 
-    - name: Get initial admin password
-      command: cat /var/lib/jenkins/secrets/initialAdminPassword
-      register: jenkins_password
-      changed_when: false
+# Verification and Debugging Tasks
+- name: Check Jenkins service status
+  shell: systemctl status jenkins.service
+  register: jenkins_status
+  changed_when: false
+  failed_when: false
+  ignore_errors: yes
 
-    - name: Ensure playbooks directory exists
-      file:
-        path: /home/nalla/Portofolio-of-Devops-Projects/Project-09_netflixcone/ansible-files/playbooks
-        state: directory
-        mode: '0755'
+- name: Print Jenkins service status
+  debug:
+    var: jenkins_status.stdout_lines
+  when: jenkins_status.rc == 0
 
-    - name: Write Jenkins initial admin password to file
-      copy:
-        content: "{{ jenkins_password.stdout }}"
-        dest: /home/nalla/Portofolio-of-Devops-Projects/Project-09_netflixcone/ansible-files/playbooks/jenkins_password.txt
+- name: Get Jenkins initial admin password
+  shell: sudo cat /var/lib/jenkins/secrets/initialAdminPassword
+  register: jenkins_initial_password
+  changed_when: false
+  failed_when: false
+  ignore_errors: yes
+  when: jenkins_service is success or jenkins_status.rc == 0
 
-    - name: Display Jenkins initial admin password
-      debug:
-        var: jenkins_password.stdout
+- name: Print Jenkins initial admin password
+  debug:
+    msg: "Jenkins initial admin password: {{ jenkins_initial_password.stdout }}"
+  when: jenkins_initial_password is defined and jenkins_initial_password.rc == 0
+
+
+

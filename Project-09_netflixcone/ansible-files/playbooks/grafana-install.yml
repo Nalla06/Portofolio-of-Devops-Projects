@@ -1,30 +1,53 @@
 ---
+# Tasks to install Grafana
+- name: Add Grafana GPG key
+  apt_key:
+    url: "https://packages.grafana.com/gpg.key"
+    state: present
+
+- name: Add Grafana APT repository
+  apt_repository:
+    repo: "deb https://packages.grafana.com/oss/deb stable main"
+    state: present
+
+- name: Update APT package cache
+  apt:
+    update_cache: yes
+
 - name: Install Grafana
-  hosts: monitoring_server
-  become: true
+  apt:
+    name: grafana
+    state: present
 
-  tasks:
-    - name: Add Grafana GPG key
-      apt_key:
-        url: "https://packages.grafana.com/gpg.key"
-        state: present
+- name: Enable and start Grafana service
+  systemd:
+    name: grafana-server
+    enabled: true
+    state: started
 
-    - name: Add Grafana APT repository
-      apt_repository:
-        repo: "deb https://packages.grafana.com/oss/deb stable main"
-        state: present
+- name: Add Prometheus as Grafana data source
+  grafana_datasource:
+    name: Prometheus
+    type: prometheus
+    url: http://{{ prometheus_server }}:{{ prometheus_port }}  # Using the defined variables
+    access: proxy
+    is_default: true
+    state: present
 
-    - name: Update APT package cache
-      apt:
-        update_cache: yes
+- name: Import Jenkins dashboard to Grafana
+  grafana_dashboard:
+    grafana_url: "http://localhost:3000"
+    dashboard:
+      title: "Jenkins"
+      uid: "jenkins-dashboard"
+      input_json: "{{ lookup('file', 'jenkins_dashboard.json') }}"
+    state: present
 
-    - name: Install Grafana
-      apt:
-        name: grafana
-        state: present
-
-    - name: Enable and start Grafana service
-      systemd:
-        name: grafana-server
-        enabled: true
-        state: started
+- name: Import Kubernetes dashboard to Grafana
+  grafana_dashboard:
+    grafana_url: "http://localhost:3000"
+    dashboard:
+      title: "Kubernetes Cluster"
+      uid: "kubernetes-dashboard"
+      input_json: "{{ lookup('file', 'kubernetes_dashboard.json') }}"
+    state: present

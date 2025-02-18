@@ -1,0 +1,30 @@
+---
+# Tasks to setup Kubernetes Master
+- name: Initialize Kubernetes master
+  shell: kubeadm init --pod-network-cidr=10.244.0.0/16
+  register: kubeadm_output
+  args:
+    creates: /etc/kubernetes/admin.conf
+
+- name: Save kubeadm join command for workers
+  shell: |
+    kubeadm token create --print-join-command
+  register: join_command
+  changed_when: false
+
+- name: Copy join command to local file
+  local_action:
+    module: copy
+    content: "{{ join_command.stdout }}"
+    dest: "./kubeadm_join.sh"
+  become: false
+
+- name: Setup kubeconfig for root user
+  shell: |
+    mkdir -p $HOME/.kube
+    cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+    chown $(id -u):$(id -g) $HOME/.kube/config
+
+- name: Apply Flannel CNI
+  shell: |
+    kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml

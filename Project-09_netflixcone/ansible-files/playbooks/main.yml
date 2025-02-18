@@ -1,0 +1,42 @@
+---
+- name: Install Jenkins and related components
+  hosts: jenkins-EC2
+  become: yes
+  tasks:
+    - name: Run Jenkins installation playbook
+      import_tasks: jenkins-install.yml
+
+    - name: Run Docker installation playbook
+      import_tasks: docker-install.yml
+
+    - name: Run SonarQube installation playbook
+      import_tasks: run-sonarqube.yml
+
+    - name: Run Trivy installation playbook
+      import_tasks: trivy-install.yml
+
+    - name: Run Jenkins plugins installation playbook
+      import_tasks: jenkins-post-configuration-install.yml
+
+- name: Install Kubernetes Master Node
+  hosts: k8s_master
+  become: yes
+  tasks:
+    - name: Run Kubernetes Master installation playbook
+      import_tasks: kubernetes-master-install.yml
+- name: Join Worker Nodes to Kubernetes Cluster
+  hosts: k8s_workers
+  become: yes
+  tasks:
+    - name: Run Kubernetes Worker join playbook
+      import_tasks: kubernetes-worker-join.yml
+
+- name: Install Monitoring Stack (Prometheus & Grafana)
+  hosts: monitoring_server
+  become: yes
+  tasks:
+    - name: Run Prometheus installation playbook
+      import_tasks: prometheus-install.yml
+
+    - name: Run Grafana installation playbook
+      import_tasks: grafana-install.yml

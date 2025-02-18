@@ -1,0 +1,12 @@
+---
+# Tasks to join Worker Nodes to Kubernetes Cluster
+- name: Copy join command from local to worker nodes
+  copy:
+    src: ./kubeadm_join.sh
+    dest: /tmp/kubeadm_join.sh
+    mode: '0755'
+
+- name: Join the Kubernetes cluster
+  shell: sh /tmp/kubeadm_join.sh
+  args:
+    creates: /etc/kubernetes/kubelet.conf
