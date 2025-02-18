@@ -1,25 +1,78 @@
-name: Check Environment
+name: Deploy Super Mario Game to EKS
 
-on: [push]
+on:
+  push:
+    branches:
+      - main
 
 jobs:
-  check-environment:
+  deploy:
     runs-on: self-hosted
 
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: supermario-game
+      CLUSTER_NAME: super-mario-eks
+
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@v2
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v2
-      with:
-        node-version: '16'
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
 
-    - name: List files in the working directory
-      run: Get-ChildItem -Path ${{ github.workspace }} -Recurse
-      shell: pwsh
+      - name: Debug Node.js Setup
+        run: |
+          echo "Checking Node.js version..."
+          node -v || echo "Node.js is not installed"
+          echo "Checking npm version..."
+          npm -v || echo "npm is not installed"
+          echo "Checking file system permissions..."
+          ls -la $(dirname $(which node))
+          ls -la $(dirname $(which npm))
 
-    - name: Check environment
-      run: .\check-environment.ps1
-      shell: pwsh
-      working-directory: ${{ github.workspace }}
+      - name: Install dependencies
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS
+        run: npm install
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: Initialize Terraform
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/terraform
+        run: terraform init
+
+      - name: Apply Terraform
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/terraform
+        run: terraform apply -auto-approve
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build Docker image
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/docker
+        run: docker build -t ${{ env.ECR_REPOSITORY }} .
+
+      - name: Tag Docker image
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/docker
+        run: docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Push Docker image to ECR
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/docker
+        run: docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+
+      - name: Update Kubernetes deployment
+        working-directory: Project-10_Supermario_game_deployment_AWS_EKS/k8s
+        run: |
+          kubectl apply -f k8s-deployment.yml
+          kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
