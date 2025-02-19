@@ -101,64 +101,33 @@ jobs:
             echo "Initializing Terraform in $(pwd)"
             terraform init
           else
-            echo "SEARCHING for terraform files..."
-            TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
-            if [ -n "$TERRAFORM_DIR" ]; then
-              cd "$TERRAFORM_DIR"
-              echo "Found Terraform directory at $(pwd)"
-              terraform init
-            else
-              echo "ERROR: terraform-files directory not found anywhere in the repository."
-              exit 1
-            fi
-          fi
-      - name: Destroy existing resources (optional)
-        run: |
-          if [ -d "terraform-files" ]; then
-              cd terraform-files
-              echo "Destroying existing Terraform resources in $(pwd)"
-              terraform destroy -auto-approve
-            else
-              TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
-              if [ -n "$TERRAFORM_DIR" ]; then
-                cd "$TERRAFORM_DIR"
-                echo "Found Terraform directory at $(pwd), destroying resources"
-                terraform destroy -auto-approve
-              else
-                echo "ERROR: terraform-files directory not found."
-                exit 1
-              fi
-            fi
-  
-      - name: Check EKS cluster existence
-        id: check-cluster
-        run: |
-          if aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            echo "EKS cluster already exists"
-            echo "cluster_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "EKS cluster doesn't exist"
-            echo "cluster_exists=false" >> $GITHUB_OUTPUT
+            echo "ERROR: terraform-files directory not found."
+            exit 1
           fi
 
-      - name: Apply Terraform (if needed)
-        if: steps.check-cluster.outputs.cluster_exists == 'false'
+      # Immediately destroy the current infrastructure before creating new ones
+      - name: Destroy existing Terraform resources
         run: |
           if [ -d "terraform-files" ]; then
             cd terraform-files
+            echo "Destroying existing Terraform resources in $(pwd)"
+            terraform destroy -auto-approve
           else
-            TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
-            if [ -n "$TERRAFORM_DIR" ]; then
-              cd "$TERRAFORM_DIR"
-            else
-              echo "ERROR: terraform-files directory not found."
-              exit 1
-            fi
+            echo "ERROR: terraform-files directory not found."
+            exit 1
           fi
-          
-          echo "Applying Terraform in $(pwd)"
-          terraform apply -auto-approve
 
+      # Apply Terraform to create new resources after destruction
+      - name: Apply Terraform to create resources
+        run: |
+          if [ -d "terraform-files" ]; then
+            cd terraform-files
+            echo "Applying Terraform in $(pwd)"
+            terraform apply -auto-approve
+          else
+            echo "ERROR: terraform-files directory not found."
+            exit 1
+          fi
       - name: Check if Docker is available
         id: check-docker
         run: |
