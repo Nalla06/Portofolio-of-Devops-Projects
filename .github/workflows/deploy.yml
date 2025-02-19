@@ -13,35 +13,34 @@ jobs:
       AWS_REGION: us-east-1
       ECR_REPOSITORY: supermario-game
       CLUSTER_NAME: super-mario-eks
+      PROJECT_DIR: Project-10_Supermario_game_deployment_AWS_EKS
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Change to project directory
+        run: |
+          echo "Changing to project directory..."
+          cd ${{ env.PROJECT_DIR }}
+          echo "Current working directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la
 
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: '16'
 
-      - name: Verify Node.js Setup
-        run: |
-          echo "Node.js version:"
-          node -v
-          echo "npm version:"
-          npm -v
-          echo "Current directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la
-
       - name: Install dependencies
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
           if [ -f "package.json" ]; then
+            echo "Installing dependencies in $(pwd)"
             npm install
           else
-            echo "package.json not found in current directory:"
-            pwd
-            echo "Directory contents:"
+            echo "package.json not found in $(pwd)"
             ls -la
             exit 1
           fi
@@ -50,19 +49,13 @@ jobs:
         uses: hashicorp/setup-terraform@v1
 
       - name: Initialize Terraform
-        working-directory: ./terarform-files
+        working-directory: ${{ env.PROJECT_DIR }}/terarform-files
         run: |
-          if [ -d "." ]; then
-            terraform init
-          else
-            echo "terraform-files directory not found"
-            echo "Current directory contents:"
-            ls -la
-            exit 1
-          fi
+          echo "Initializing Terraform in $(pwd)"
+          terraform init
 
       - name: Apply Terraform
-        working-directory: ./terarform-files
+        working-directory: ${{ env.PROJECT_DIR }}/terarform-files
         run: terraform apply -auto-approve
 
       - name: Configure AWS credentials
@@ -77,35 +70,25 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build Docker image
-        working-directory: ./docker
+        working-directory: ${{ env.PROJECT_DIR }}/docker
         run: |
-          if [ -d "." ]; then
-            docker build -t ${{ env.ECR_REPOSITORY }} .
-          else
-            echo "docker directory not found"
-            echo "Current directory contents:"
-            ls -la
-            exit 1
-          fi
+          echo "Building Docker image in $(pwd)"
+          docker build -t ${{ env.ECR_REPOSITORY }} .
 
       - name: Tag Docker image
+        working-directory: ${{ env.PROJECT_DIR }}
         run: docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Push Docker image to ECR
+        working-directory: ${{ env.PROJECT_DIR }}
         run: docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Update kubeconfig for cluster authentication
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
 
       - name: Update Kubernetes deployment
-        working-directory: ./k8s
+        working-directory: ${{ env.PROJECT_DIR }}/k8s
         run: |
-          if [ -d "." ]; then
-            kubectl apply -f k8s-deployment.yml
-            kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
-          else
-            echo "k8s directory not found"
-            echo "Current directory contents:"
-            ls -la
-            exit 1
-          fi
+          echo "Applying K8s configs in $(pwd)"
+          kubectl apply -f k8s-deployment.yml
+          kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
