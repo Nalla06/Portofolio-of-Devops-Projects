@@ -13,11 +13,18 @@ jobs:
       AWS_REGION: us-east-1
       ECR_REPOSITORY: supermario-game
       CLUSTER_NAME: super-mario-eks
-      PROJECT_DIR: Project-10_Supermario_game_deployment_AWS_EKS
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+
+      - name: Debug directory structure
+        run: |
+          echo "Current working directory: $(pwd)"
+          echo "Repository contents:"
+          ls -la
+          echo "All directories:"
+          find . -type d -not -path "*/\.*" | sort
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -33,14 +40,12 @@ jobs:
 
       - name: Install dependencies
         run: |
-          cd ${{ env.PROJECT_DIR }}
           if [ -f "package.json" ]; then
             echo "Installing dependencies in $(pwd)"
             npm install
           else
-            echo "ERROR: package.json not found in $(pwd)"
+            echo "WARNING: package.json not found in $(pwd)"
             ls -la
-            exit 1
           fi
 
       - name: Set up Terraform
@@ -48,13 +53,21 @@ jobs:
 
       - name: Initialize Terraform
         run: |
-          cd ${{ env.PROJECT_DIR }}/terraform-files
-          if [ -d "." ]; then
+          if [ -d "terraform-files" ]; then
+            cd terraform-files
             echo "Initializing Terraform in $(pwd)"
             terraform init
           else
-            echo "ERROR: Directory ${{ env.PROJECT_DIR }}/terraform-files does not exist."
-            exit 1
+            echo "SEARCHING for terraform files..."
+            TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
+            if [ -n "$TERRAFORM_DIR" ]; then
+              cd "$TERRAFORM_DIR"
+              echo "Found Terraform directory at $(pwd)"
+              terraform init
+            else
+              echo "ERROR: terraform-files directory not found anywhere in the repository."
+              exit 1
+            fi
           fi
 
       - name: Check EKS cluster existence
@@ -71,7 +84,19 @@ jobs:
       - name: Apply Terraform (if needed)
         if: steps.check-cluster.outputs.cluster_exists == 'false'
         run: |
-          cd ${{ env.PROJECT_DIR }}/terraform-files
+          if [ -d "terraform-files" ]; then
+            cd terraform-files
+          else
+            TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
+            if [ -n "$TERRAFORM_DIR" ]; then
+              cd "$TERRAFORM_DIR"
+            else
+              echo "ERROR: terraform-files directory not found."
+              exit 1
+            fi
+          fi
+          
+          echo "Applying Terraform in $(pwd)"
           terraform apply -auto-approve
 
       - name: Log in to Amazon ECR
@@ -90,9 +115,20 @@ jobs:
 
       - name: Build Docker image
         run: |
-          cd ${{ env.PROJECT_DIR }}/docker
-          echo "Building Docker image in $(pwd)"
-          docker build -t ${{ env.ECR_REPOSITORY }} .
+          if [ -d "docker" ]; then
+            DOCKER_DIR="docker"
+          else
+            DOCKER_DIR=$(find . -type d -name "docker" | head -n 1)
+          fi
+          
+          if [ -n "$DOCKER_DIR" ]; then
+            cd "$DOCKER_DIR"
+            echo "Building Docker image in $(pwd)"
+            docker build -t ${{ env.ECR_REPOSITORY }} .
+          else
+            echo "ERROR: Docker directory not found."
+            exit 1
+          fi
 
       - name: Tag Docker image
         run: |
@@ -107,9 +143,20 @@ jobs:
 
       - name: Apply Kubernetes deployment
         run: |
-          cd ${{ env.PROJECT_DIR }}/k8s
-          echo "Applying K8s configs in $(pwd)"
-          kubectl apply -f k8s-deployment.yml
+          if [ -d "k8s" ]; then
+            K8S_DIR="k8s"
+          else
+            K8S_DIR=$(find . -type d -name "k8s" | head -n 1)
+          fi
+          
+          if [ -n "$K8S_DIR" ]; then
+            cd "$K8S_DIR"
+            echo "Applying K8s configs in $(pwd)"
+            kubectl apply -f k8s-deployment.yml
+          else
+            echo "ERROR: k8s directory not found."
+            exit 1
+          fi
 
       - name: Update container image
         run: |
