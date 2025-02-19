@@ -59,7 +59,6 @@ jobs:
           source $HOME/.bashrc
           echo "AWS CLI Version: $(aws --version)"
 
-
       - name: Ensure kubectl is available
         run: |
           if ! command -v kubectl &> /dev/null; then
@@ -105,8 +104,9 @@ jobs:
             exit 1
           fi
 
-      # Immediately destroy the current infrastructure before creating new ones
+      # Conditionally destroy the current infrastructure if confirm_destroy is 'yes'
       - name: Destroy existing Terraform resources
+        if: ${{ github.event.inputs.confirm_destroy == 'yes' }}
         run: |
           if [ -d "terraform-files" ]; then
             cd terraform-files
@@ -128,6 +128,7 @@ jobs:
             echo "ERROR: terraform-files directory not found."
             exit 1
           fi
+
       - name: Check if Docker is available
         id: check-docker
         run: |
@@ -203,6 +204,7 @@ jobs:
               echo "Updating container image..."
               kubectl set image deployment/supermario-game supermario-game=${{ steps.check-ecr.outputs.ECR_URI }}:latest
               
+
               echo "Waiting for deployment to complete..."
               kubectl rollout status deployment/supermario-game --timeout=180s
             fi
