@@ -19,14 +19,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Change to project directory
-        run: |
-          echo "Changing to project directory..."
-          cd ${{ env.PROJECT_DIR }}
-          echo "Current working directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Set up Node.js
         uses: actions/setup-node@v2
@@ -34,13 +32,13 @@ jobs:
           node-version: '16'
 
       - name: Install dependencies
-        working-directory: ${{ env.PROJECT_DIR }}
         run: |
+          cd ${{ env.PROJECT_DIR }}
           if [ -f "package.json" ]; then
             echo "Installing dependencies in $(pwd)"
             npm install
           else
-            echo "package.json not found in $(pwd)"
+            echo "ERROR: package.json not found in $(pwd)"
             ls -la
             exit 1
           fi
@@ -49,48 +47,50 @@ jobs:
         uses: hashicorp/setup-terraform@v1
 
       - name: Initialize Terraform
-        working-directory: ${{ env.PROJECT_DIR }}/terraform-files
         run: |
-          if [ -d "${{ env.PROJECT_DIR }}/terraform-files" ]; then
+          cd ${{ env.PROJECT_DIR }}/terraform-files
+          if [ -d "." ]; then
             echo "Initializing Terraform in $(pwd)"
             terraform init
           else
-            echo "Directory ${{ env.PROJECT_DIR }}/terraform-files does not exist."
+            echo "ERROR: Directory ${{ env.PROJECT_DIR }}/terraform-files does not exist."
             exit 1
           fi
 
-      - name: Check if Terraform resources already exist
-        id: terraform-check
-        working-directory: ${{ env.PROJECT_DIR }}/terraform-files
+      - name: Check EKS cluster existence
+        id: check-cluster
         run: |
-          if [ -d "${{ env.PROJECT_DIR }}/terraform-files" ]; then
-            if terraform state list >/dev/null 2>&1; then
-              echo "Terraform resources exist."
-              echo "exists=true" >> $GITHUB_ENV
-            else
-              echo "Applying Terraform..."
-              terraform apply -auto-approve
-              echo "exists=false" >> $GITHUB_ENV
-            fi
+          if aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+            echo "EKS cluster already exists"
+            echo "cluster_exists=true" >> $GITHUB_OUTPUT
           else
-            echo "Directory ${{ env.PROJECT_DIR }}/terraform-files does not exist."
-            exit 1
+            echo "EKS cluster doesn't exist"
+            echo "cluster_exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+      - name: Apply Terraform (if needed)
+        if: steps.check-cluster.outputs.cluster_exists == 'false'
+        run: |
+          cd ${{ env.PROJECT_DIR }}/terraform-files
+          terraform apply -auto-approve
 
       - name: Log in to Amazon ECR
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v1
 
-      - name: Build Docker image
-        working-directory: ${{ env.PROJECT_DIR }}/docker
+      - name: Check if ECR repository exists
+        id: check-ecr
         run: |
+          if aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+            echo "ECR repository exists"
+          else
+            echo "Creating ECR repository"
+            aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }}
+          fi
+
+      - name: Build Docker image
+        run: |
+          cd ${{ env.PROJECT_DIR }}/docker
           echo "Building Docker image in $(pwd)"
           docker build -t ${{ env.ECR_REPOSITORY }} .
 
@@ -105,9 +105,21 @@ jobs:
       - name: Update kubeconfig for cluster authentication
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
 
-      - name: Update Kubernetes deployment
-        working-directory: ${{ env.PROJECT_DIR }}/k8s
+      - name: Apply Kubernetes deployment
         run: |
+          cd ${{ env.PROJECT_DIR }}/k8s
           echo "Applying K8s configs in $(pwd)"
           kubectl apply -f k8s-deployment.yml
+
+      - name: Update container image
+        run: |
           kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          
+      - name: Wait for deployment
+        run: |
+          kubectl rollout status deployment/supermario-game --timeout=180s
+          
+      - name: Get service information
+        run: |
+          echo "Deployment complete! Access your Super Mario game at:"
+          kubectl get svc supermario-service -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"
