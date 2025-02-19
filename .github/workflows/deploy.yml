@@ -29,7 +29,24 @@ jobs:
           echo "Checking for Docker: $(which docker || echo 'not found')"
           echo "Checking for kubectl: $(which kubectl || echo 'not found')"
 
-      - name: Install AWS CLI locally
+      - name: Configure AWS credentials
+        run: |
+          mkdir -p $HOME/.aws
+          cat > $HOME/.aws/credentials << EOF
+          [default]
+          aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          EOF
+          
+          cat > $HOME/.aws/config << EOF
+          [default]
+          region=${{ env.AWS_REGION }}
+          output=json
+          EOF
+          
+          echo "AWS credentials configured"
+
+      - name: Ensure AWS CLI is available
         run: |
           if ! command -v aws &> /dev/null; then
             echo "AWS CLI not found, installing to user directory..."
@@ -47,29 +64,7 @@ jobs:
             aws --version
           fi
 
-      - name: Configure AWS credentials
-        run: |
-          mkdir -p $HOME/.aws
-          cat > $HOME/.aws/credentials << EOF
-          [default]
-          aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          EOF
-          
-          cat > $HOME/.aws/config << EOF
-          [default]
-          region=${{ env.AWS_REGION }}
-          output=json
-          EOF
-          
-          echo "AWS credentials configured"
-          
-          # Ensure AWS CLI is in the PATH for this session
-          if [ -d "$HOME/bin" ]; then
-            export PATH=$HOME/bin:$PATH
-          fi
-
-      - name: Install kubectl locally
+      - name: Ensure kubectl is available
         run: |
           if ! command -v kubectl &> /dev/null; then
             echo "kubectl not found, installing to user directory..."
@@ -125,18 +120,7 @@ jobs:
       - name: Check EKS cluster existence
         id: check-cluster
         run: |
-          # Ensure AWS CLI is in PATH
-          export PATH=$HOME/bin:$PATH
-          
-          if [ -f "$HOME/bin/aws" ]; then
-            AWS_CMD="$HOME/bin/aws"
-          else
-            AWS_CMD="aws"
-          fi
-          
-          echo "Using AWS CLI: $($AWS_CMD --version)"
-          
-          if $AWS_CMD eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+          if aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
             echo "EKS cluster already exists"
             echo "cluster_exists=true" >> $GITHUB_OUTPUT
           else
@@ -176,20 +160,12 @@ jobs:
       - name: Check if ECR repository exists
         id: check-ecr
         run: |
-          export PATH=$HOME/bin:$PATH
-          
-          if [ -f "$HOME/bin/aws" ]; then
-            AWS_CMD="$HOME/bin/aws"
-          else
-            AWS_CMD="aws"
-          fi
-          
-          if $AWS_CMD ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+          if aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
             echo "ECR repository exists"
-            echo "ECR_URI=$($AWS_CMD ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)" >> $GITHUB_OUTPUT
+            echo "ECR_URI=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)" >> $GITHUB_OUTPUT
           else
             echo "Creating ECR repository"
-            ECR_URI=$($AWS_CMD ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} --query 'repository.repositoryUri' --output text)
+            ECR_URI=$(aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} --query 'repository.repositoryUri' --output text)
             echo "Created ECR repository: $ECR_URI"
             echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
           fi
@@ -197,17 +173,9 @@ jobs:
       - name: Build and push Docker image
         if: steps.check-docker.outputs.docker_available == 'true'
         run: |
-          export PATH=$HOME/bin:$PATH
-          
-          if [ -f "$HOME/bin/aws" ]; then
-            AWS_CMD="$HOME/bin/aws"
-          else
-            AWS_CMD="aws"
-          fi
-          
           # Get ECR login token
           echo "Logging in to ECR..."
-          ECR_PASSWORD=$($AWS_CMD ecr get-login-password --region ${{ env.AWS_REGION }})
+          ECR_PASSWORD=$(aws ecr get-login-password --region ${{ env.AWS_REGION }})
           ECR_REGISTRY=$(echo "${{ steps.check-ecr.outputs.ECR_URI }}" | cut -d'/' -f1)
           echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
           
@@ -232,33 +200,11 @@ jobs:
 
       - name: Update kubeconfig for cluster authentication
         run: |
-          export PATH=$HOME/bin:$PATH
-          
-          if [ -f "$HOME/bin/aws" ]; then
-            AWS_CMD="$HOME/bin/aws"
-          else
-            AWS_CMD="aws"
-          fi
-          
-          if [ -f "$HOME/bin/kubectl" ]; then
-            KUBECTL_CMD="$HOME/bin/kubectl"
-          else
-            KUBECTL_CMD="kubectl"
-          fi
-          
           echo "Updating kubeconfig..."
-          $AWS_CMD eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
 
       - name: Apply Kubernetes deployment
         run: |
-          export PATH=$HOME/bin:$PATH
-          
-          if [ -f "$HOME/bin/kubectl" ]; then
-            KUBECTL_CMD="$HOME/bin/kubectl"
-          else
-            KUBECTL_CMD="kubectl"
-          fi
-          
           if [ -d "k8s" ]; then
             K8S_DIR="k8s"
           else
@@ -268,19 +214,19 @@ jobs:
           if [ -n "$K8S_DIR" ]; then
             cd "$K8S_DIR"
             echo "Applying K8s configs in $(pwd)"
-            $KUBECTL_CMD apply -f k8s-deployment.yml
+            kubectl apply -f k8s-deployment.yml
             
             # Update the image if Docker was available
             if [ "${{ steps.check-docker.outputs.docker_available }}" == "true" ]; then
               echo "Updating container image..."
-              $KUBECTL_CMD set image deployment/supermario-game supermario-game=${{ steps.check-ecr.outputs.ECR_URI }}:latest
+              kubectl set image deployment/supermario-game supermario-game=${{ steps.check-ecr.outputs.ECR_URI }}:latest
               
               echo "Waiting for deployment to complete..."
-              $KUBECTL_CMD rollout status deployment/supermario-game --timeout=180s
+              kubectl rollout status deployment/supermario-game --timeout=180s
             fi
             
             echo "Deployment complete! Access your Super Mario game at:"
-            $KUBECTL_CMD get svc supermario-service -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"
+            kubectl get svc supermario-service -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"
           else
             echo "ERROR: k8s directory not found."
             exit 1
