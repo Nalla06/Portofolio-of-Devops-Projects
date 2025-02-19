@@ -49,22 +49,22 @@ jobs:
         uses: hashicorp/setup-terraform@v1
 
       - name: Initialize Terraform
-        working-directory: ${{ env.PROJECT_DIR }}/terarform-files
+        working-directory: ${{ env.PROJECT_DIR }}/terraform-files
         run: |
           echo "Initializing Terraform in $(pwd)"
           terraform init
 
-      - name: Apply Terraform
+      - name: Check if Terraform is already applied
         working-directory: ${{ env.PROJECT_DIR }}/terraform-files
         run: |
-          if terraform state list; then
-            echo "Terraform resources already exist. Skipping apply..."
+          if terraform state list >/dev/null 2>&1; then
+            echo "Terraform resources exist. Skipping apply..."
           else
-            echo "Terraform resources do not exist. Initializing..."
+            echo "Applying Terraform..."
             terraform init
             terraform apply -auto-approve
           fi
-          
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1
         with:
@@ -83,12 +83,12 @@ jobs:
           docker build -t ${{ env.ECR_REPOSITORY }} .
 
       - name: Tag Docker image
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+        run: |
+          docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Push Docker image to ECR
-        working-directory: ${{ env.PROJECT_DIR }}
-        run: docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+        run: |
+          docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Update kubeconfig for cluster authentication
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
