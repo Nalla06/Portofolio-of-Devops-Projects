@@ -59,6 +59,7 @@ jobs:
           source $HOME/.bashrc
           echo "AWS CLI Version: $(aws --version)"
 
+
       - name: Ensure kubectl is available
         run: |
           if ! command -v kubectl &> /dev/null; then
@@ -100,34 +101,57 @@ jobs:
             echo "Initializing Terraform in $(pwd)"
             terraform init
           else
-            echo "ERROR: terraform-files directory not found."
-            exit 1
+            echo "SEARCHING for terraform files..."
+            TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
+            if [ -n "$TERRAFORM_DIR" ]; then
+              cd "$TERRAFORM_DIR"
+              echo "Found Terraform directory at $(pwd)"
+              terraform init
+            else
+              echo "ERROR: terraform-files directory not found anywhere in the repository."
+              exit 1
+            fi
           fi
-
-      # Conditionally destroy the current infrastructure if confirm_destroy is 'yes'
       - name: Destroy existing Terraform resources
         if: ${{ github.event.inputs.confirm_destroy == 'yes' }}
         run: |
-          if [ -d "terraform-files" ]; then
-            cd terraform-files
-            echo "Destroying existing Terraform resources in $(pwd)"
-            terraform destroy -auto-approve
+            if [ -d "terraform-files" ]; then
+              cd terraform-files
+              echo "Destroying existing Terraform resources in $(pwd)"
+              terraform destroy -auto-approve
+            else
+              echo "ERROR: terraform-files directory not found."
+              exit 1
+            fi
+  
+      - name: Check EKS cluster existence
+        id: check-cluster
+        run: |
+          if aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+            echo "EKS cluster already exists"
+            echo "cluster_exists=true" >> $GITHUB_OUTPUT
           else
-            echo "ERROR: terraform-files directory not found."
-            exit 1
+            echo "EKS cluster doesn't exist"
+            echo "cluster_exists=false" >> $GITHUB_OUTPUT
           fi
 
-      # Apply Terraform to create new resources after destruction
-      - name: Apply Terraform to create resources
+      - name: Apply Terraform (if needed)
+        if: steps.check-cluster.outputs.cluster_exists == 'false'
         run: |
           if [ -d "terraform-files" ]; then
             cd terraform-files
-            echo "Applying Terraform in $(pwd)"
-            terraform apply -auto-approve
           else
-            echo "ERROR: terraform-files directory not found."
-            exit 1
+            TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
+            if [ -n "$TERRAFORM_DIR" ]; then
+              cd "$TERRAFORM_DIR"
+            else
+              echo "ERROR: terraform-files directory not found."
+              exit 1
+            fi
           fi
+          
+          echo "Applying Terraform in $(pwd)"
+          terraform apply -auto-approve
 
       - name: Check if Docker is available
         id: check-docker
@@ -204,7 +228,6 @@ jobs:
               echo "Updating container image..."
               kubectl set image deployment/supermario-game supermario-game=${{ steps.check-ecr.outputs.ECR_URI }}:latest
               
-
               echo "Waiting for deployment to complete..."
               kubectl rollout status deployment/supermario-game --timeout=180s
             fi
