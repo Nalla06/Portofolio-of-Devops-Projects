@@ -57,11 +57,9 @@ jobs:
             echo "export PATH=$HOME/bin:$PATH" >> $HOME/.bashrc
             export PATH=$HOME/bin:$PATH
             rm -rf aws awscliv2.zip
-            echo "AWS CLI installed to $HOME/bin:"
-            $HOME/bin/aws --version
+            echo "AWS CLI installed successfully."
           else
-            echo "AWS CLI already installed:"
-            aws --version
+            echo "AWS CLI already installed: $(aws --version)"
           fi
 
       - name: Ensure kubectl is available
