@@ -54,15 +54,17 @@ jobs:
           echo "Initializing Terraform in $(pwd)"
           terraform init
 
-      - name: Check if Terraform is already applied
+      - name: Check if Terraform resources already exist
+        id: terraform-check
         working-directory: ${{ env.PROJECT_DIR }}/terraform-files
         run: |
           if terraform state list >/dev/null 2>&1; then
-            echo "Terraform resources exist. Skipping apply..."
+            echo "Terraform resources exist."
+            echo "exists=true" >> $GITHUB_ENV
           else
             echo "Applying Terraform..."
-            terraform init
             terraform apply -auto-approve
+            echo "exists=false" >> $GITHUB_ENV
           fi
 
       - name: Configure AWS credentials
