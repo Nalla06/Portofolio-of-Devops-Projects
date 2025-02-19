@@ -4,7 +4,13 @@ on:
   push:
     branches:
       - main
-
+  workflow_dispatch:  # Allows manual trigger for Terraform destroy
+    inputs:
+      confirm_destroy:
+        description: "Type 'yes' to confirm Terraform destroy"
+        required: true
+  delete:  # Destroys infra when the main branch is deleted
+  
 jobs:
   deploy:
     runs-on: self-hosted
@@ -53,7 +59,7 @@ jobs:
           source $HOME/.bashrc
           echo "AWS CLI Version: $(aws --version)"
 
-          
+
       - name: Ensure kubectl is available
         run: |
           if ! command -v kubectl &> /dev/null; then
