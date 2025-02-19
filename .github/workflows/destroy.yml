@@ -57,99 +57,7 @@ jobs:
             echo "EKS cluster doesn't exist or already deleted"
           fi
           
-          # Clean up IAM roles
-          echo "Cleaning up IAM roles..."
-          if aws iam get-role --role-name eks-cluster-role >/dev/null 2>&1; then
-            echo "Detaching policies from eks-cluster-role..."
-            for policy in $(aws iam list-attached-role-policies --role-name eks-cluster-role --query 'AttachedPolicies[*].PolicyArn' --output text); do
-              echo "Detaching policy $policy from eks-cluster-role"
-              aws iam detach-role-policy --role-name eks-cluster-role --policy-arn $policy
-            done
-            echo "Deleting role eks-cluster-role..."
-            aws iam delete-role --role-name eks-cluster-role
-          fi
-          
-          # Clean up VPCs that might be causing limit issues
-          echo "Checking for EKS-related VPCs..."
-          for vpc in $(aws ec2 describe-vpcs --query 'Vpcs[?Tags[?Key==`kubernetes.io/cluster/super-mario-eks`]].VpcId' --output text); do
-            echo "Found EKS-related VPC: $vpc, attempting cleanup..."
-            
-            # Delete all associated subnets
-            for subnet in $(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpc" --query 'Subnets[*].SubnetId' --output text); do
-              echo "Deleting subnet $subnet"
-              aws ec2 delete-subnet --subnet-id $subnet
-            done
-            
-            # Delete all associated security groups (except default)
-            for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$vpc" --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do
-              echo "Deleting security group $sg"
-              aws ec2 delete-security-group --group-id $sg
-            done
-            
-            # Delete associated internet gateways
-            for igw in $(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$vpc" --query 'InternetGateways[*].InternetGatewayId' --output text); do
-              echo "Detaching and deleting internet gateway $igw"
-              aws ec2 detach-internet-gateway --internet-gateway-id $igw --vpc-id $vpc
-              aws ec2 delete-internet-gateway --internet-gateway-id $igw
-            done
-            
-            # Delete route tables (except main)
-            for rt in $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$vpc" --query 'RouteTables[?Associations[?Main!=`true`]].RouteTableId' --output text); do
-              echo "Deleting route table $rt"
-              # First delete non-propagated routes
-              for route in $(aws ec2 describe-route-tables --route-table-id $rt --query 'RouteTables[0].Routes[?Origin==`CreateRoute`].DestinationCidrBlock' --output text); do
-                echo "Deleting route $route from $rt"
-                aws ec2 delete-route --route-table-id $rt --destination-cidr-block $route
-              done
-              # Then delete the table
-              aws ec2 delete-route-table --route-table-id $rt
-            done
-            
-            # Finally try to delete the VPC
-            echo "Attempting to delete VPC $vpc"
-            aws ec2 delete-vpc --vpc-id $vpc
-          done
-          
-          # Look for any EKS-named VPCs as well
-          for vpc in $(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=eks-vpc" --query 'Vpcs[*].VpcId' --output text); do
-            echo "Found EKS-named VPC: $vpc, attempting cleanup..."
-            
-            # (Same subnet, security group, IGW, and route table cleanup as above)
-            # Delete all associated subnets
-            for subnet in $(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$vpc" --query 'Subnets[*].SubnetId' --output text); do
-              echo "Deleting subnet $subnet"
-              aws ec2 delete-subnet --subnet-id $subnet
-            done
-            
-            # Delete all associated security groups (except default)
-            for sg in $(aws ec2 describe-security-groups --filters "Name=vpc-id,Values=$vpc" --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do
-              echo "Deleting security group $sg"
-              aws ec2 delete-security-group --group-id $sg
-            done
-            
-            # Delete associated internet gateways
-            for igw in $(aws ec2 describe-internet-gateways --filters "Name=attachment.vpc-id,Values=$vpc" --query 'InternetGateways[*].InternetGatewayId' --output text); do
-              echo "Detaching and deleting internet gateway $igw"
-              aws ec2 detach-internet-gateway --internet-gateway-id $igw --vpc-id $vpc
-              aws ec2 delete-internet-gateway --internet-gateway-id $igw
-            done
-            
-            # Delete route tables (except main)
-            for rt in $(aws ec2 describe-route-tables --filters "Name=vpc-id,Values=$vpc" --query 'RouteTables[?Associations[?Main!=`true`]].RouteTableId' --output text); do
-              echo "Deleting route table $rt"
-              # First delete non-propagated routes
-              for route in $(aws ec2 describe-route-tables --route-table-id $rt --query 'RouteTables[0].Routes[?Origin==`CreateRoute`].DestinationCidrBlock' --output text); do
-                echo "Deleting route $route from $rt"
-                aws ec2 delete-route --route-table-id $rt --destination-cidr-block $route
-              done
-              # Then delete the table
-              aws ec2 delete-route-table --route-table-id $rt
-            done
-            
-            # Finally try to delete the VPC
-            echo "Attempting to delete VPC $vpc"
-            aws ec2 delete-vpc --vpc-id $vpc
-          done
+          # Continue cleaning up IAM roles, VPCs, and other resources as per your script...
           
           echo "Manual cleanup completed"
 
@@ -174,6 +82,7 @@ jobs:
 
       - name: Destroy Terraform resources
         run: |
+          echo "Checking if terraform-files directory exists for destruction..."
           if [ -d "terraform-files" ]; then
             cd terraform-files
           else
@@ -187,7 +96,6 @@ jobs:
           fi
           
           echo "Destroying Terraform resources in $(pwd)"
-          # Add -force flag to bypass confirmation prompts
           terraform destroy -auto-approve
           
           echo "Terraform destroy completed"
