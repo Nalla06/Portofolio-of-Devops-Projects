@@ -10,7 +10,7 @@ on:
         description: "Type 'yes' to confirm Terraform destroy"
         required: true
   delete:  # Destroys infra when the main branch is deleted
-  
+
 jobs:
   deploy:
     runs-on: self-hosted
@@ -112,7 +112,24 @@ jobs:
               exit 1
             fi
           fi
-
+          - name: Destroy existing resources (optional)
+          run: |
+            if [ -d "terraform-files" ]; then
+              cd terraform-files
+              echo "Destroying existing Terraform resources in $(pwd)"
+              terraform destroy -auto-approve
+            else
+              TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
+              if [ -n "$TERRAFORM_DIR" ]; then
+                cd "$TERRAFORM_DIR"
+                echo "Found Terraform directory at $(pwd), destroying resources"
+                terraform destroy -auto-approve
+              else
+                echo "ERROR: terraform-files directory not found."
+                exit 1
+              fi
+            fi
+  
       - name: Check EKS cluster existence
         id: check-cluster
         run: |
