@@ -13,142 +13,101 @@ jobs:
       AWS_REGION: us-east-1
       ECR_REPOSITORY: supermario-game
       CLUSTER_NAME: super-mario-eks
+      PROJECT_DIR: Project-10_Supermario_game_deployment_AWS_EKS
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Debug repository structure
+      - name: Change to project directory
         run: |
-          echo "Current directory: $(pwd)"
-          echo "Repository contents:"
+          echo "Changing to project directory..."
+          cd ${{ env.PROJECT_DIR }}
+          echo "Current working directory:"
+          pwd
+          echo "Directory contents:"
           ls -la
-          echo "Finding package.json files:"
-          find . -name "package.json" | sort
-          echo "Finding Dockerfile:"
-          find . -name "Dockerfile" | sort
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        working-directory: ${{ env.PROJECT_DIR }}
+        run: |
+          if [ -f "package.json" ]; then
+            echo "Installing dependencies in $(pwd)"
+            npm install
+          else
+            echo "package.json not found in $(pwd)"
+            ls -la
+            exit 1
+          fi
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+
+      - name: Initialize Terraform
+        working-directory: ${{ env.PROJECT_DIR }}/terraform-files
+        run: |
+          if [ -d "${{ env.PROJECT_DIR }}/terraform-files" ]; then
+            echo "Initializing Terraform in $(pwd)"
+            terraform init
+          else
+            echo "Directory ${{ env.PROJECT_DIR }}/terraform-files does not exist."
+            exit 1
+          fi
+
+      - name: Check if Terraform resources already exist
+        id: terraform-check
+        working-directory: ${{ env.PROJECT_DIR }}/terraform-files
+        run: |
+          if [ -d "${{ env.PROJECT_DIR }}/terraform-files" ]; then
+            if terraform state list >/dev/null 2>&1; then
+              echo "Terraform resources exist."
+              echo "exists=true" >> $GITHUB_ENV
+            else
+              echo "Applying Terraform..."
+              terraform apply -auto-approve
+              echo "exists=false" >> $GITHUB_ENV
+            fi
+          else
+            echo "Directory ${{ env.PROJECT_DIR }}/terraform-files does not exist."
+            exit 1
+          fi
 
       - name: Configure AWS credentials
-        run: |
-          mkdir -p $HOME/.aws
-          cat > $HOME/.aws/credentials << EOF
-          [default]
-          aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          EOF
-          
-          cat > $HOME/.aws/config << EOF
-          [default]
-          region=${{ env.AWS_REGION }}
-          output=json
-          EOF
-          
-          echo "AWS credentials configured"
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Prepare Docker Context
-        run: |
-          # Find Dockerfile location
-          DOCKERFILE_PATH=$(find . -name "Dockerfile" | head -n 1)
-          if [ -z "$DOCKERFILE_PATH" ]; then
-            echo "ERROR: Dockerfile not found"
-            exit 1
-          fi
-          
-          DOCKER_DIR=$(dirname "$DOCKERFILE_PATH")
-          echo "Dockerfile found at: $DOCKERFILE_PATH"
-          echo "Docker directory: $DOCKER_DIR"
-          
-          # Find package.json
-          PACKAGE_JSON_PATH=$(find . -name "package.json" | head -n 1)
-          if [ -z "$PACKAGE_JSON_PATH" ]; then
-            echo "ERROR: package.json not found"
-            exit 1
-          fi
-          
-          PACKAGE_DIR=$(dirname "$PACKAGE_JSON_PATH")
-          echo "package.json found at: $PACKAGE_JSON_PATH"
-          echo "Package directory: $PACKAGE_DIR"
-          
-          # Check if they're in different directories
-          if [ "$DOCKER_DIR" != "$PACKAGE_DIR" ]; then
-            echo "Dockerfile and package.json are in different directories. Creating a proper build context..."
-            
-            # Create a temporary build directory
-            mkdir -p temp_build_context
-            
-            # Copy package.json and package-lock.json (if exists)
-            cp "$PACKAGE_JSON_PATH" temp_build_context/
-            
-            if [ -f "$PACKAGE_DIR/package-lock.json" ]; then
-              cp "$PACKAGE_DIR/package-lock.json" temp_build_context/
-            else
-              echo "{}" > temp_build_context/package-lock.json
-              echo "Created empty package-lock.json as it wasn't found"
-            fi
-            
-            # Copy Dockerfile
-            cp "$DOCKERFILE_PATH" temp_build_context/
-            
-            # Copy other important files
-            if [ -d "$PACKAGE_DIR/public" ]; then
-              cp -r "$PACKAGE_DIR/public" temp_build_context/
-            fi
-            
-            if [ -d "$PACKAGE_DIR/src" ]; then
-              cp -r "$PACKAGE_DIR/src" temp_build_context/
-            fi
-            
-            # List contents of build context
-            echo "Contents of build context:"
-            ls -la temp_build_context/
-            
-            echo "BUILD_CONTEXT=temp_build_context" >> $GITHUB_ENV
-          else
-            echo "Dockerfile and package.json are in the same directory. Using normal build context."
-            echo "BUILD_CONTEXT=$DOCKER_DIR" >> $GITHUB_ENV
-          fi
+      - name: Log in to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build Docker image
+        working-directory: ${{ env.PROJECT_DIR }}
         run: |
-          echo "Building Docker image from context: ${{ env.BUILD_CONTEXT }}"
-          cd ${{ env.BUILD_CONTEXT }}
-          docker build -t ${{ env.ECR_REPOSITORY }}:latest .
+          echo "Building Docker image in $(pwd)"
+          docker build -t ${{ env.ECR_REPOSITORY }} .
 
-      - name: Login to Amazon ECR
+      - name: Tag Docker image
         run: |
-          # Assuming aws CLI is available
-          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin $(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text | cut -d'/' -f1)
-          
-          # Set the repository URI
-          ECR_URI=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
-          if [ -z "$ECR_URI" ]; then
-            ECR_URI=$(aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} --query 'repository.repositoryUri' --output text)
-          fi
-          echo "ECR_URI=$ECR_URI" >> $GITHUB_ENV
+          docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
-      - name: Tag and Push Docker image
+      - name: Push Docker image to ECR
         run: |
-          docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ env.ECR_URI }}:latest
-          docker push ${{ env.ECR_URI }}:latest
-          echo "Successfully pushed image to ${{ env.ECR_URI }}:latest"
+          docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
-      - name: Update K8s Deployment
+      - name: Update kubeconfig for cluster authentication
+        run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
+      - name: Update Kubernetes deployment
+        working-directory: ${{ env.PROJECT_DIR }}/k8s
         run: |
-          # Update kubeconfig
-          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
-          
-          # Find and apply k8s deployment file
-          K8S_DIR=$(find . -type d -name "k8s" | head -n 1)
-          if [ -n "$K8S_DIR" ]; then
-            cd "$K8S_DIR"
-            echo "Applying K8s configs in $(pwd)"
-            kubectl apply -f k8s-deployment.yml
-            kubectl set image deployment/supermario-game supermario-game=${{ env.ECR_URI }}:latest
-            kubectl rollout status deployment/supermario-game --timeout=180s
-            
-            echo "Deployment complete! Access your Super Mario game at:"
-            kubectl get svc supermario-service -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"
-          else
-            echo "ERROR: k8s directory not found."
-            exit 1
-          fi
+          echo "Applying K8s configs in $(pwd)"
+          kubectl apply -f k8s-deployment.yml
+          kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
