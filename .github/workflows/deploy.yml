@@ -18,49 +18,68 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Debug Environment
+      - name: Debug Directory Structure
         run: |
           echo "Current working directory:"
           pwd
           echo "Directory contents:"
           ls -la
-          echo "Runner workspace:"
-          echo $GITHUB_WORKSPACE
-          echo "Runner workspace contents:"
-          ls -la $GITHUB_WORKSPACE
+          echo "Parent directory contents:"
+          ls -la ..
+
+      - name: Copy Project Files
+        run: |
+          echo "Copying project files..."
+          cp -r /home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/* .
+          echo "Verifying copied files:"
+          ls -la
 
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
           node-version: '16'
 
-      - name: Debug Node.js Setup
+      - name: Verify Node.js Setup
         run: |
-          echo "Node.js path:"
-          which node || echo "Node not found"
-          echo "npm path:"
-          which npm || echo "npm not found"
           echo "Node.js version:"
-          node --version || echo "Node version check failed"
+          node -v
           echo "npm version:"
-          npm --version || echo "npm version check failed"
+          npm -v
+          echo "Current directory:"
+          pwd
+          echo "Directory contents:"
+          ls -la
 
       - name: Install dependencies
+        working-directory: ./src  # Adjust this path based on where your package.json is
         run: |
-          echo "Installing dependencies in:"
-          pwd
-          npm install
+          if [ -f "package.json" ]; then
+            npm install
+          else
+            echo "package.json not found in current directory:"
+            pwd
+            echo "Directory contents:"
+            ls -la
+            exit 1
+          fi
 
-      # Rest of your steps remain the same
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
 
       - name: Initialize Terraform
-        working-directory: ${{ github.workspace }}/terraform-files
-        run: terraform init
+        working-directory: ./terraform-files
+        run: |
+          if [ -d "terraform-files" ]; then
+            terraform init
+          else
+            echo "terraform-files directory not found"
+            echo "Current directory contents:"
+            ls -la
+            exit 1
+          fi
 
       - name: Apply Terraform
-        working-directory: ${{ github.workspace }}/terraform-files
+        working-directory: ./terraform-files
         run: terraform apply -auto-approve
 
       - name: Configure AWS credentials
@@ -75,22 +94,35 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build Docker image
-        working-directory: ${{ github.workspace }}/docker
-        run: docker build -t ${{ env.ECR_REPOSITORY }} .
+        working-directory: ./docker
+        run: |
+          if [ -d "docker" ]; then
+            docker build -t ${{ env.ECR_REPOSITORY }} .
+          else
+            echo "docker directory not found"
+            echo "Current directory contents:"
+            ls -la
+            exit 1
+          fi
 
       - name: Tag Docker image
-        working-directory: ${{ github.workspace }}/docker
         run: docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Push Docker image to ECR
-        working-directory: ${{ github.workspace }}/docker
         run: docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Update kubeconfig for cluster authentication
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
 
       - name: Update Kubernetes deployment
-        working-directory: ${{ github.workspace }}/k8s
+        working-directory: ./k8s
         run: |
-          kubectl apply -f k8s-deployment.yml
-          kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          if [ -d "k8s" ]; then
+            kubectl apply -f k8s-deployment.yml
+            kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
+          else
+            echo "k8s directory not found"
+            echo "Current directory contents:"
+            ls -la
+            exit 1
+          fi
