@@ -112,9 +112,9 @@ jobs:
               exit 1
             fi
           fi
-          - name: Destroy existing resources (optional)
-          run: |
-            if [ -d "terraform-files" ]; then
+      - name: Destroy existing resources (optional)
+        run: |
+          if [ -d "terraform-files" ]; then
               cd terraform-files
               echo "Destroying existing Terraform resources in $(pwd)"
               terraform destroy -auto-approve
