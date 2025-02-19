@@ -59,7 +59,6 @@ jobs:
           source $HOME/.bashrc
           echo "AWS CLI Version: $(aws --version)"
 
-
       - name: Ensure kubectl is available
         run: |
           if ! command -v kubectl &> /dev/null; then
@@ -112,6 +111,7 @@ jobs:
               exit 1
             fi
           fi
+
       - name: Destroy existing Terraform resources
         if: ${{ github.event.inputs.confirm_destroy == 'yes' }}
         run: |
@@ -134,8 +134,10 @@ jobs:
             exit 1
           fi
   
+      # Only run cluster check if this isn't a destroy and apply operation
       - name: Check EKS cluster existence
         id: check-cluster
+        if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
         run: |
           if aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
             echo "EKS cluster already exists"
@@ -145,8 +147,11 @@ jobs:
             echo "cluster_exists=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Apply Terraform (if needed)
-        if: steps.check-cluster.outputs.cluster_exists == 'false'
+      # Apply Terraform in two cases:
+      # 1. This is a destroy+apply operation (confirm_destroy is 'yes')
+      # 2. Cluster doesn't exist in a normal run
+      - name: Apply Terraform
+        if: ${{ github.event.inputs.confirm_destroy == 'yes' || steps.check-cluster.outputs.cluster_exists == 'false' }}
         run: |
           if [ -d "terraform-files" ]; then
             cd terraform-files
