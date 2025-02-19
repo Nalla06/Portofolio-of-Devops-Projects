@@ -51,20 +51,30 @@ jobs:
       - name: Initialize Terraform
         working-directory: ${{ env.PROJECT_DIR }}/terraform-files
         run: |
-          echo "Initializing Terraform in $(pwd)"
-          terraform init
+          if [ -d "${{ env.PROJECT_DIR }}/terraform-files" ]; then
+            echo "Initializing Terraform in $(pwd)"
+            terraform init
+          else
+            echo "Directory ${{ env.PROJECT_DIR }}/terraform-files does not exist."
+            exit 1
+          fi
 
       - name: Check if Terraform resources already exist
         id: terraform-check
         working-directory: ${{ env.PROJECT_DIR }}/terraform-files
         run: |
-          if terraform state list >/dev/null 2>&1; then
-            echo "Terraform resources exist."
-            echo "exists=true" >> $GITHUB_ENV
+          if [ -d "${{ env.PROJECT_DIR }}/terraform-files" ]; then
+            if terraform state list >/dev/null 2>&1; then
+              echo "Terraform resources exist."
+              echo "exists=true" >> $GITHUB_ENV
+            else
+              echo "Applying Terraform..."
+              terraform apply -auto-approve
+              echo "exists=false" >> $GITHUB_ENV
+            fi
           else
-            echo "Applying Terraform..."
-            terraform apply -auto-approve
-            echo "exists=false" >> $GITHUB_ENV
+            echo "Directory ${{ env.PROJECT_DIR }}/terraform-files does not exist."
+            exit 1
           fi
 
       - name: Configure AWS credentials
