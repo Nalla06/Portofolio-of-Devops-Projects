@@ -4,6 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:  # Allows manual trigger for Terraform destroy
+    inputs:
+      confirm_destroy:
+        description: "Type 'yes' to confirm Terraform destroy"
+        required: true
+  delete:  # Destroys infra when the main branch is deleted
 
 jobs:
   deploy:
@@ -53,6 +59,7 @@ jobs:
           source $HOME/.bashrc
           echo "AWS CLI Version: $(aws --version)"
 
+
       - name: Ensure kubectl is available
         run: |
           if ! command -v kubectl &> /dev/null; then
@@ -94,31 +101,86 @@ jobs:
             echo "Initializing Terraform in $(pwd)"
             terraform init
           else
-            echo "ERROR: terraform-files directory not found."
-            exit 1
+            echo "SEARCHING for terraform files..."
+            TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
+            if [ -n "$TERRAFORM_DIR" ]; then
+              cd "$TERRAFORM_DIR"
+              echo "Found Terraform directory at $(pwd)"
+              terraform init
+            else
+              echo "ERROR: terraform-files directory not found anywhere in the repository."
+              exit 1
+            fi
           fi
-
-      - name: Terraform Destroy (if needed)
-        run: |
-          cd terraform-files
-          echo "Running terraform destroy to clean up existing resources"
-          terraform destroy -auto-approve
-
-      - name: Apply Terraform (create new resources)
-        run: |
-          cd terraform-files
-          echo "Running terraform apply to create resources"
-          terraform apply -auto-approve
-
+          - name: Destroy existing resources (optional)
+          run: |
+            if [ -d "terraform-files" ]; then
+              cd terraform-files
+              echo "Destroying existing Terraform resources in $(pwd)"
+              terraform destroy -auto-approve
+            else
+              TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
+              if [ -n "$TERRAFORM_DIR" ]; then
+                cd "$TERRAFORM_DIR"
+                echo "Found Terraform directory at $(pwd), destroying resources"
+                terraform destroy -auto-approve
+              else
+                echo "ERROR: terraform-files directory not found."
+                exit 1
+              fi
+            fi
+  
       - name: Check EKS cluster existence
         id: check-cluster
         run: |
           if aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
             echo "EKS cluster already exists"
-            echo "cluster_exists=true" >> $GITHUB_ENV
+            echo "cluster_exists=true" >> $GITHUB_OUTPUT
           else
             echo "EKS cluster doesn't exist"
-            echo "cluster_exists=false" >> $GITHUB_ENV
+            echo "cluster_exists=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Apply Terraform (if needed)
+        if: steps.check-cluster.outputs.cluster_exists == 'false'
+        run: |
+          if [ -d "terraform-files" ]; then
+            cd terraform-files
+          else
+            TERRAFORM_DIR=$(find . -type d -name "terraform-files" | head -n 1)
+            if [ -n "$TERRAFORM_DIR" ]; then
+              cd "$TERRAFORM_DIR"
+            else
+              echo "ERROR: terraform-files directory not found."
+              exit 1
+            fi
+          fi
+          
+          echo "Applying Terraform in $(pwd)"
+          terraform apply -auto-approve
+
+      - name: Check if Docker is available
+        id: check-docker
+        run: |
+          if command -v docker &> /dev/null; then
+            echo "Docker is available"
+            echo "docker_available=true" >> $GITHUB_OUTPUT
+          else
+            echo "WARNING: Docker is not available on this runner"
+            echo "docker_available=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check if ECR repository exists
+        id: check-ecr
+        run: |
+          if aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
+            echo "ECR repository exists"
+            echo "ECR_URI=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)" >> $GITHUB_OUTPUT
+          else
+            echo "Creating ECR repository"
+            ECR_URI=$(aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} --query 'repository.repositoryUri' --output text)
+            echo "Created ECR repository: $ECR_URI"
+            echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
           fi
 
       - name: Build and push Docker image
