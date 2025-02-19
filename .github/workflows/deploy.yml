@@ -18,22 +18,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Debug Directory Structure
-        run: |
-          echo "Current working directory:"
-          pwd
-          echo "Directory contents:"
-          ls -la
-          echo "Parent directory contents:"
-          ls -la ..
-
-      - name: Copy Project Files
-        run: |
-          echo "Copying project files..."
-          cp -r /home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/* .
-          echo "Verifying copied files:"
-          ls -la
-
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
@@ -51,7 +35,6 @@ jobs:
           ls -la
 
       - name: Install dependencies
-        working-directory: ./src  # Adjust this path based on where your package.json is
         run: |
           if [ -f "package.json" ]; then
             npm install
@@ -67,9 +50,9 @@ jobs:
         uses: hashicorp/setup-terraform@v1
 
       - name: Initialize Terraform
-        working-directory: ./terraform-files
+        working-directory: ./terarform-files
         run: |
-          if [ -d "terraform-files" ]; then
+          if [ -d "." ]; then
             terraform init
           else
             echo "terraform-files directory not found"
@@ -79,7 +62,7 @@ jobs:
           fi
 
       - name: Apply Terraform
-        working-directory: ./terraform-files
+        working-directory: ./terarform-files
         run: terraform apply -auto-approve
 
       - name: Configure AWS credentials
@@ -96,7 +79,7 @@ jobs:
       - name: Build Docker image
         working-directory: ./docker
         run: |
-          if [ -d "docker" ]; then
+          if [ -d "." ]; then
             docker build -t ${{ env.ECR_REPOSITORY }} .
           else
             echo "docker directory not found"
@@ -117,7 +100,7 @@ jobs:
       - name: Update Kubernetes deployment
         working-directory: ./k8s
         run: |
-          if [ -d "k8s" ]; then
+          if [ -d "." ]; then
             kubectl apply -f k8s-deployment.yml
             kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
           else
