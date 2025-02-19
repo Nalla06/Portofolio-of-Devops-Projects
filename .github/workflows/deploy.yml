@@ -113,10 +113,26 @@ jobs:
             fi
           fi
       - name: Destroy existing Terraform resources
+        if: ${{ github.event.inputs.confirm_destroy == 'yes' }}
         run: |
-          echo "Destroying existing Terraform resources..."
-          cd terraform-files
-          terraform destroy -auto-approve
+          echo "Checking if terraform-files directory exists..."
+          if [ -d "terraform-files" ]; then
+            echo "terraform-files directory found. Navigating to it."
+            cd terraform-files
+            echo "Destroying existing Terraform resources in $(pwd)"
+              
+            # Execute Terraform destroy and capture the output
+            terraform destroy -auto-approve
+            if [ $? -eq 0 ]; then
+              echo "Terraform destroy completed successfully."
+            else
+              echo "Terraform destroy failed."
+              exit 1
+            fi
+          else
+            echo "ERROR: terraform-files directory not found."
+            exit 1
+          fi
   
       - name: Check EKS cluster existence
         id: check-cluster
