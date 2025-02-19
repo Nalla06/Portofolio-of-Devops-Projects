@@ -13,7 +13,8 @@ jobs:
       AWS_REGION: us-east-1
       ECR_REPOSITORY: supermario-game
       CLUSTER_NAME: super-mario-eks
-      PROJECT_PATH: /home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS
+      # Remove the absolute path and use relative paths instead
+      # GitHub Actions will use the workspace directory automatically
 
     steps:
       - name: Checkout code
@@ -25,29 +26,27 @@ jobs:
           node-version: '16'
 
       - name: Debug Node.js Setup
-        working-directory: ${{ env.PROJECT_PATH }}
         run: |
           echo "Checking Node.js version..."
-          node -v || echo "Node.js is not installed"
+          node -v
           echo "Checking npm version..."
-          npm -v || echo "npm is not installed"
-          echo "Checking file system permissions..."
-          ls -la $(dirname $(which node))
-          ls -la $(dirname $(which npm))
+          npm -v
+          echo "Checking working directory..."
+          pwd
+          ls -la
 
       - name: Install dependencies
-        working-directory: ${{ env.PROJECT_PATH }}
         run: npm install
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
 
       - name: Initialize Terraform
-        working-directory: ${{ env.PROJECT_PATH }}/terraform-files
+        working-directory: ./terraform-files
         run: terraform init
 
       - name: Apply Terraform
-        working-directory: ${{ env.PROJECT_PATH }}/terraform-files
+        working-directory: ./terraform-files
         run: terraform apply -auto-approve
 
       - name: Configure AWS credentials
@@ -62,22 +61,22 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v1
 
       - name: Build Docker image
-        working-directory: ${{ env.PROJECT_PATH }}/docker
+        working-directory: ./docker
         run: docker build -t ${{ env.ECR_REPOSITORY }} .
 
       - name: Tag Docker image
-        working-directory: ${{ env.PROJECT_PATH }}/docker
+        working-directory: ./docker
         run: docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Push Docker image to ECR
-        working-directory: ${{ env.PROJECT_PATH }}/docker
+        working-directory: ./docker
         run: docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
 
       - name: Update kubeconfig for cluster authentication
         run: aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
 
       - name: Update Kubernetes deployment
-        working-directory: ${{ env.PROJECT_PATH }}/k8s
+        working-directory: ./k8s
         run: |
           kubectl apply -f k8s-deployment.yml
           kubectl set image deployment/supermario-game supermario-game=${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPOSITORY }}:latest
