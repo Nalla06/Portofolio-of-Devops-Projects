@@ -22,32 +22,21 @@ jobs:
       TERRAFORM_DIR: /home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/terraform-files
 
     steps:
-      - name: Install AWS CLI
+      - name: Set up environment variables
         run: |
-          echo "Downloading AWS CLI..."
-          rm -f awscliv2.zip
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to download AWS CLI"
-            exit 1
-          fi
-
-          echo "Unzipping AWS CLI..."
-          unzip -o awscliv2.zip
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to unzip AWS CLI"
-            exit 1
-          fi
-
-          echo "Installing AWS CLI..."
-          sudo ./aws/install
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to install AWS CLI"
-            exit 1
-          fi
-          echo "AWS CLI installed successfully"
-          export PATH=$PATH:/home/nalla/aws-cli/v2/2.24.7/dist
+          echo "Setting up environment variables..."
+          export PATH=$HOME/aws-cli/v2/2.24.7/dist:$PATH
           echo "PATH is now: $PATH"
+
+      - name: Check current AWS CLI installation
+        run: |
+          echo "Checking current AWS CLI installation..."
+          if command -v aws &> /dev/null; then
+            echo "AWS CLI is installed at: $(which aws)"
+            echo "AWS CLI version: $(aws --version)"
+          else
+            echo "AWS CLI not found."
+          fi
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v1
@@ -101,7 +90,7 @@ jobs:
       - name: Configure ECR and build/push image
         if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
         run: |
-          export PATH=$PATH:/home/nalla/aws-cli/v2/2.24.7/dist
+          export PATH=$HOME/aws-cli/v2/2.24.7/dist:$PATH
           DOCKER_DIR=/home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/docker
           
           echo "Setting up ECR repository..."
@@ -139,6 +128,7 @@ jobs:
       - name: Deploy to Kubernetes
         if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
         run: |
+          export PATH=$HOME/aws-cli/v2/2.24.7/dist:$PATH
           K8S_DIR=/home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/k8s
           
           echo "Configuring kubectl..."
