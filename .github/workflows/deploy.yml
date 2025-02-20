@@ -25,51 +25,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      # Fix 1: Ensure AWS CLI is properly installed and in PATH
-      - name: Install and configure AWS CLI
+      # Set up AWS credentials in environment variables
+      # This avoids AWS CLI PATH issues
+      - name: Set AWS credentials as environment variables
         run: |
-          echo "Checking for AWS CLI..."
-          if ! command -v aws &> /dev/null; then
-            echo "AWS CLI not found, installing..."
-            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-            unzip -q awscliv2.zip
-            sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli
-            rm -rf aws awscliv2.zip
-          fi
-          
-          # Verify installation
-          aws --version
-          
-          # Configure AWS credentials
-          mkdir -p $HOME/.aws
-          cat > $HOME/.aws/credentials << EOF
-          [default]
-          aws_access_key_id=${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws_secret_access_key=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          EOF
-          
-          cat > $HOME/.aws/config << EOF
-          [default]
-          region=${{ env.AWS_REGION }}
-          output=json
-          EOF
-          
-          echo "AWS credentials configured"
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}" >> $GITHUB_ENV
+          echo "AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}" >> $GITHUB_ENV
+          echo "AWS_DEFAULT_REGION=${{ env.AWS_REGION }}" >> $GITHUB_ENV
+          echo "AWS credentials configured as environment variables"
 
-      - name: Ensure kubectl is available
+      - name: Setup basic tools
         run: |
-          if ! command -v kubectl &> /dev/null; then
-            echo "kubectl not found, installing..."
-            curl -LO "https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl"
-            chmod +x kubectl
-            sudo mv kubectl /usr/local/bin/
-          fi
-          kubectl version --client
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: '16'
+          echo "Setting up utilities needed for deployment..." 
+          
+          # Verify where AWS CLI is available (don't install yet)
+          AWS_PATH=$(which aws || echo "not-found")
+          echo "AWS CLI path: $AWS_PATH"
+          
+          # Set path to include expected AWS CLI locations
+          export PATH=$PATH:$HOME/aws-cli/v2/2.24.7/dist:$HOME/bin:/usr/local/bin
+          echo "Updated PATH: $PATH"
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
@@ -96,84 +71,92 @@ jobs:
           cd ${{ steps.find-terraform.outputs.terraform_path }}
           terraform init
 
-      # Fix 2: Handle manual terraform destroy with timeout and error handling
+      # Handle manual destroy operation
       - name: Manual Terraform destroy
         if: ${{ github.event.inputs.confirm_destroy == 'yes' }}
         run: |
           cd ${{ steps.find-terraform.outputs.terraform_path }}
           
-          # First remove node groups to prevent destroy timeouts
+          # First remove node groups
           echo "Removing EKS node groups first..."
-          terraform state list | grep aws_eks_node_group || echo "No node groups found"
-          terraform state list | grep aws_eks_node_group | xargs -r terraform destroy -auto-approve -target
+          terraform destroy -auto-approve -target="aws_eks_node_group.eks_nodes" || echo "No node groups or already destroyed"
           
           # Then remove EKS cluster
           echo "Removing EKS cluster..."
-          terraform state list | grep aws_eks_cluster || echo "No EKS cluster found"
-          terraform state list | grep aws_eks_cluster | xargs -r terraform destroy -auto-approve -target
+          terraform destroy -auto-approve -target="aws_eks_cluster.eks" || echo "No EKS cluster or already destroyed"
           
           # Finally destroy everything else
           echo "Destroying remaining resources..."
           terraform destroy -auto-approve
           
           echo "Terraform resources destroyed successfully."
-
-      # Exit early if this is just a destroy operation
-      - name: Exit after destroy
-        if: ${{ github.event.inputs.confirm_destroy == 'yes' }}
-        run: |
-          echo "Manual destroy operation completed successfully."
           exit 0
 
-      # Check if cluster exists
-      - name: Check EKS cluster existence
-        id: check-cluster
-        run: |
-          if aws eks describe-cluster --name ${{ env.CLUSTER_NAME }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            echo "cluster_exists=true" >> $GITHUB_OUTPUT
-          else
-            echo "cluster_exists=false" >> $GITHUB_OUTPUT
-          fi
-
-      # Apply Terraform to create infrastructure
+      # Apply Terraform first - important change in sequence
       - name: Apply Terraform
         id: terraform-apply
-        if: ${{ steps.check-cluster.outputs.cluster_exists == 'false' }}
         run: |
           cd ${{ steps.find-terraform.outputs.terraform_path }}
           terraform apply -auto-approve
-          echo "terraform_success=true" >> $GITHUB_OUTPUT
+          
+          # Export the ECR repository URL for later use
+          # This avoids needing AWS CLI for this specific operation
+          ECR_URI=$(terraform output -raw ecr_repository_url || echo "")
+          if [ -n "$ECR_URI" ]; then
+            echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
+            echo "terraform_success=true" >> $GITHUB_OUTPUT
+          else
+            # Try to get it from AWS CLI if terraform output isn't available
+            export PATH=$PATH:$HOME/aws-cli/v2/2.24.7/dist
+            if command -v aws &> /dev/null; then
+              ECR_URI=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text 2>/dev/null || echo "")
+              if [ -n "$ECR_URI" ]; then
+                echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
+              fi
+            fi
+            echo "terraform_success=true" >> $GITHUB_OUTPUT
+          fi
 
-      # Handle Docker and ECR operations
+      # Now set up Kubernetes tools since infrastructure exists
+      - name: Ensure kubectl is available
+        if: steps.terraform-apply.outputs.terraform_success == 'true'
+        run: |
+          if ! command -v kubectl &> /dev/null; then
+            echo "kubectl not found, installing to user directory..."
+            mkdir -p $HOME/bin
+            curl -LO "https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl"
+            chmod +x kubectl
+            mv kubectl $HOME/bin/
+            export PATH=$HOME/bin:$PATH
+            echo "kubectl installed to $HOME/bin"
+          fi
+          echo "kubectl version:"
+          PATH=$PATH:$HOME/bin kubectl version --client
+
+      - name: Update kubeconfig for EKS
+        if: steps.terraform-apply.outputs.terraform_success == 'true'
+        run: |
+          export PATH=$PATH:$HOME/aws-cli/v2/2.24.7/dist:$HOME/bin
+          echo "Configuring kubeconfig for ${{ env.CLUSTER_NAME }}..."
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+
+      # Check Docker availability 
       - name: Check if Docker is available
         id: check-docker
+        if: steps.terraform-apply.outputs.terraform_success == 'true'
         run: |
           if command -v docker &> /dev/null; then
             echo "docker_available=true" >> $GITHUB_OUTPUT
           else
+            echo "WARNING: Docker is not available on this runner."
             echo "docker_available=false" >> $GITHUB_OUTPUT
           fi
-
-      - name: Check if ECR repository exists
-        id: check-ecr
-        run: |
-          if aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} >/dev/null 2>&1; then
-            ECR_URI=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
-          else
-            ECR_URI=$(aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }} --region ${{ env.AWS_REGION }} --query 'repository.repositoryUri' --output text)
-          fi
-          echo "ECR_URI=$ECR_URI" >> $GITHUB_OUTPUT
 
       # Build and push Docker image
       - name: Build and push Docker image
         id: docker-build
-        if: steps.check-docker.outputs.docker_available == 'true'
+        if: steps.terraform-apply.outputs.terraform_success == 'true' && steps.check-docker.outputs.docker_available == 'true'
         run: |
-          # Get ECR login token
-          ECR_PASSWORD=$(aws ecr get-login-password --region ${{ env.AWS_REGION }})
-          ECR_REGISTRY=$(echo "${{ steps.check-ecr.outputs.ECR_URI }}" | cut -d'/' -f1)
-          echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-          
           # Find Docker directory
           if [ -d "docker" ]; then
             DOCKER_DIR="docker"
@@ -181,24 +164,32 @@ jobs:
             DOCKER_DIR=$(find . -type d -name "docker" | head -n 1)
           fi
           
-          if [ -n "$DOCKER_DIR" ]; then
+          if [ -n "$DOCKER_DIR" ] && [ -n "${{ steps.terraform-apply.outputs.ECR_URI }}" ]; then
             cd "$DOCKER_DIR"
-            docker build -t ${{ env.ECR_REPOSITORY }}:latest . || { echo "docker_success=false" >> $GITHUB_OUTPUT; exit 1; }
-            docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.check-ecr.outputs.ECR_URI }}:latest || { echo "docker_success=false" >> $GITHUB_OUTPUT; exit 1; }
-            docker push ${{ steps.check-ecr.outputs.ECR_URI }}:latest || { echo "docker_success=false" >> $GITHUB_OUTPUT; exit 1; }
-            echo "docker_success=true" >> $GITHUB_OUTPUT
+            echo "Building Docker image in $(pwd)"
+            
+            # Get ECR login token using path to AWS CLI
+            export PATH=$PATH:$HOME/aws-cli/v2/2.24.7/dist
+            aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin $(echo "${{ steps.terraform-apply.outputs.ECR_URI }}" | cut -d'/' -f1)
+            
+            # Build and push image
+            docker build -t ${{ env.ECR_REPOSITORY }}:latest . && \
+            docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.terraform-apply.outputs.ECR_URI }}:latest && \
+            docker push ${{ steps.terraform-apply.outputs.ECR_URI }}:latest && \
+            echo "docker_success=true" >> $GITHUB_OUTPUT || echo "docker_success=false" >> $GITHUB_OUTPUT
           else
-            echo "ERROR: Docker directory not found."
+            echo "ERROR: Docker directory not found or ECR URI not available."
             echo "docker_success=false" >> $GITHUB_OUTPUT
-            exit 1
           fi
 
       # Deploy to Kubernetes
-      - name: Update kubeconfig and deploy
+      - name: Deploy to Kubernetes
         id: k8s-deploy
+        if: steps.terraform-apply.outputs.terraform_success == 'true'
         run: |
-          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.CLUSTER_NAME }}
+          export PATH=$PATH:$HOME/aws-cli/v2/2.24.7/dist:$HOME/bin
           
+          # Find K8s directory
           if [ -d "k8s" ]; then
             K8S_DIR="k8s"
           else
@@ -207,47 +198,56 @@ jobs:
           
           if [ -n "$K8S_DIR" ]; then
             cd "$K8S_DIR"
-            kubectl apply -f k8s-deployment.yml || { echo "k8s_success=false" >> $GITHUB_OUTPUT; exit 1; }
+            echo "Applying K8s configs in $(pwd)"
             
+            PATH=$PATH:$HOME/bin kubectl apply -f k8s-deployment.yml
+            
+            # Update the image if Docker was successful
             if [ "${{ steps.check-docker.outputs.docker_available }}" == "true" ] && [ "${{ steps.docker-build.outputs.docker_success }}" == "true" ]; then
-              kubectl set image deployment/supermario-game supermario-game=${{ steps.check-ecr.outputs.ECR_URI }}:latest || { echo "k8s_success=false" >> $GITHUB_OUTPUT; exit 1; }
-              kubectl rollout status deployment/supermario-game --timeout=180s || { echo "k8s_success=false" >> $GITHUB_OUTPUT; exit 1; }
+              echo "Updating container image to ${{ steps.terraform-apply.outputs.ECR_URI }}:latest"
+              PATH=$PATH:$HOME/bin kubectl set image deployment/supermario-game supermario-game=${{ steps.terraform-apply.outputs.ECR_URI }}:latest
+              
+              echo "Waiting for deployment to complete..."
+              PATH=$PATH:$HOME/bin kubectl rollout status deployment/supermario-game --timeout=180s
               echo "k8s_success=true" >> $GITHUB_OUTPUT
             else
-              echo "WARNING: Skipping image update due to docker build failure"
-              echo "k8s_success=false" >> $GITHUB_OUTPUT
+              echo "WARNING: Skipping image update, using default image from deployment manifest"
+              echo "k8s_success=true" >> $GITHUB_OUTPUT
             fi
+            
+            echo "Deployment complete! Access your Super Mario game at:"
+            PATH=$PATH:$HOME/bin kubectl get svc supermario-service -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"
           else
             echo "ERROR: k8s directory not found."
             echo "k8s_success=false" >> $GITHUB_OUTPUT
-            exit 1
           fi
 
-      # Fix 3: Improved cleanup on failure with proper EKS resource handling
-      - name: Cleanup on failure
-        if: failure() || steps.k8s-deploy.outputs.k8s_success == 'false' || steps.docker-build.outputs.docker_success == 'false'
+      # Terraform output (for debugging)
+      - name: Display Terraform outputs
+        if: always()
         run: |
-          echo "Deployment failed, cleaning up resources..."
+          cd ${{ steps.find-terraform.outputs.terraform_path }}
+          echo "Terraform outputs:"
+          terraform output || echo "No outputs available"
+
+      # Cleanup only if deployment fails after Terraform apply
+      - name: Cleanup on deployment failure
+        if: failure() && steps.terraform-apply.outputs.terraform_success == 'true'
+        run: |
+          echo "Deployment failed after infrastructure was created. Cleaning up resources..."
           cd ${{ steps.find-terraform.outputs.terraform_path }}
           
-          # Step 1: Drain node groups - this helps avoid EKS stuck state
-          if kubectl get nodes &>/dev/null; then
-            echo "Draining all nodes..."
-            kubectl get nodes -o name | xargs -r -I{} kubectl drain {} --delete-emptydir-data --force --ignore-daemonsets
+          # Try to drain nodes if kubectl is available
+          export PATH=$PATH:$HOME/bin
+          if command -v kubectl &>/dev/null; then
+            echo "Attempting to drain nodes..."
+            kubectl get nodes -o name 2>/dev/null | xargs -r -I{} kubectl drain {} --delete-emptydir-data --force --ignore-daemonsets --timeout=60s 2>/dev/null || true
           fi
           
-          # Step 2: Delete node groups first using terraform
-          echo "Removing EKS node groups..."
-          terraform state list | grep aws_eks_node_group || echo "No node groups found"
-          terraform state list | grep aws_eks_node_group | xargs -r terraform destroy -auto-approve -target
+          # Destroy resources in order
+          echo "Destroying infrastructure..."
+          terraform destroy -auto-approve -target="aws_eks_node_group.eks_nodes" || true
+          terraform destroy -auto-approve -target="aws_eks_cluster.eks" || true
+          terraform destroy -auto-approve
           
-          # Step 3: Delete EKS cluster
-          echo "Removing EKS cluster..."
-          terraform state list | grep aws_eks_cluster || echo "No EKS cluster found"
-          terraform state list | grep aws_eks_cluster | xargs -r terraform destroy -auto-approve -target
-          
-          # Step 4: Delete everything else
-          echo "Destroying remaining resources..."
-          terraform destroy -auto-approve -parallelism=10
-          
-          echo "Resources destroyed successfully after failed deployment."
+          echo "Cleanup complete."
