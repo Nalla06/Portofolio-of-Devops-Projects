@@ -98,4 +98,67 @@ jobs:
           echo "Waiting for infrastructure to be ready..."
           sleep 30
 
-      - name: Configure ECR and build/p ▋
+      - name: Configure ECR and build/push image
+        if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
+        run: |
+          export PATH=$PATH:/home/nalla/aws-cli/v2/2.24.7/dist
+          DOCKER_DIR=/home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/docker
+          
+          echo "Setting up ECR repository..."
+          if ! aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} >/dev/null 2>&1; then
+            echo "Creating ECR repository..."
+            aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }}
+          else
+            echo "ECR repository already exists."
+          fi
+          
+          echo "Logging into ECR repository: ${{ env.ECR_URI }}"
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} | docker login --username AWS --password-stdin ${{ env.ECR_URI }}
+          
+          if [ ! -d "$DOCKER_DIR" ]; then
+            echo "Error: Docker directory not found at $DOCKER_DIR"
+            exit 1
+          fi
+          
+          echo "Building Docker image..."
+          cd $DOCKER_DIR
+          if [ ! -f "Dockerfile" ]; then
+            echo "Error: Dockerfile not found at $DOCKER_DIR"
+            exit 1
+          fi
+          docker build -t ${{ env.ECR_REPOSITORY }}:latest .
+          docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ env.ECR_URI }}:latest
+          
+          echo "Pushing image to ECR..."
+          docker push ${{ env.ECR_URI }}:latest
+
+      - name: Configure kubectl
+        if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
+        uses: azure/setup-kubectl@v3
+
+      - name: Deploy to Kubernetes
+        if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
+        run: |
+          K8S_DIR=/home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/k8s
+          
+          echo "Configuring kubectl..."
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }}
+          
+          if [ ! -d "$K8S_DIR" ]; then
+            echo "Error: k8s directory not found at $K8S_DIR"
+            exit 1
+          fi
+          
+          cd $K8S_DIR
+          echo "Applying Kubernetes configurations..."
+          kubectl apply -f k8s-deployment.yml
+          
+          echo "Updating deployment with new image..."
+          kubectl set image deployment/supermario-game supermario-game=${{ env.ECR_URI }}:latest
+          
+          echo "Waiting for deployment to complete..."
+          kubectl rollout status deployment/supermario-game --timeout=180s
+          
+          echo "Getting service URL..."
+          HOSTNAME=$(kubectl get svc supermario-service -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
+          echo "Service is available at: $HOSTNAME"
