@@ -36,12 +36,13 @@ jobs:
       - name: Install AWS CLI
         run: |
           curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
+          unzip -o awscliv2.zip
           ./aws/install --install-dir $HOME/aws-cli
           echo "AWS CLI version:"
           $HOME/aws-cli/v2/current/bin/aws --version
           echo "AWS CLI installed successfully."
       
+    
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
