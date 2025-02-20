@@ -110,7 +110,8 @@ jobs:
           fi
           
           echo "Building Docker image..."
-          docker build -t ${{ env.ECR_REPOSITORY }}:latest -f $DOCKER_DIR/Dockerfile .
+          cd $DOCKER_DIR  # Ensure the script is running from the correct directory
+          docker build -t ${{ env.ECR_REPOSITORY }}:latest -f Dockerfile .
           docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ env.ECR_URI }}:latest
           
           echo "Pushing image to ECR..."
