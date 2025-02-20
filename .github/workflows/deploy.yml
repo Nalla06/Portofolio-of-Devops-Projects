@@ -17,7 +17,7 @@ jobs:
     env:
       AWS_REGION: us-east-1
       ECR_REPOSITORY: supermario-game
-      ECR_URI: 631172387421.dkr.ecr.us-east-1.amazonaws.com/supermario-game
+      ECR_URI: 123456789012.dkr.ecr.us-east-1.amazonaws.com/supermario-game
       CLUSTER_NAME: super-mario-eks
       TERRAFORM_DIR: /home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/terraform-files
 
@@ -110,12 +110,7 @@ jobs:
           fi
           
           echo "Building Docker image..."
-          cd $DOCKER_DIR
-          if [ ! -f "Dockerfile" ]; then
-            echo "Error: Dockerfile not found at $DOCKER_DIR"
-            exit 1
-          fi
-          docker build -t ${{ env.ECR_REPOSITORY }}:latest .
+          docker build -t ${{ env.ECR_REPOSITORY }}:latest -f $DOCKER_DIR/Dockerfile .
           docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ env.ECR_URI }}:latest
           
           echo "Pushing image to ECR..."
