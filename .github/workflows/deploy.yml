@@ -4,16 +4,17 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Allows manual trigger for Terraform destroy
+  workflow_dispatch:
     inputs:
       confirm_destroy:
         description: "Type 'yes' to confirm Terraform destroy"
         required: true
-  delete:  # Destroys infra when the main branch is deleted
+  delete:
 
 jobs:
   deploy:
     runs-on: self-hosted
+
     env:
       AWS_REGION: us-east-1
       ECR_REPOSITORY: supermario-game
@@ -24,8 +25,22 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Configure AWS credentials
+      # Fix 1: Ensure AWS CLI is properly installed and in PATH
+      - name: Install and configure AWS CLI
         run: |
+          echo "Checking for AWS CLI..."
+          if ! command -v aws &> /dev/null; then
+            echo "AWS CLI not found, installing..."
+            curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+            unzip -q awscliv2.zip
+            sudo ./aws/install --bin-dir /usr/local/bin --install-dir /usr/local/aws-cli
+            rm -rf aws awscliv2.zip
+          fi
+          
+          # Verify installation
+          aws --version
+          
+          # Configure AWS credentials
           mkdir -p $HOME/.aws
           cat > $HOME/.aws/credentials << EOF
           [default]
@@ -38,21 +53,16 @@ jobs:
           region=${{ env.AWS_REGION }}
           output=json
           EOF
-
-      # Setup steps for tooling
-      - name: Ensure AWS CLI is available
-        run: |
-          export PATH=$HOME/aws-cli/v2/2.24.7/dist:$PATH
-          echo "AWS CLI Version: $(aws --version)"
+          
+          echo "AWS credentials configured"
 
       - name: Ensure kubectl is available
         run: |
           if ! command -v kubectl &> /dev/null; then
-            mkdir -p $HOME/bin
+            echo "kubectl not found, installing..."
             curl -LO "https://dl.k8s.io/release/v1.25.0/bin/linux/amd64/kubectl"
             chmod +x kubectl
-            mv kubectl $HOME/bin/
-            export PATH=$HOME/bin:$PATH
+            sudo mv kubectl /usr/local/bin/
           fi
           kubectl version --client
 
@@ -86,12 +96,26 @@ jobs:
           cd ${{ steps.find-terraform.outputs.terraform_path }}
           terraform init
 
-      # Destroy resources if manually triggered
+      # Fix 2: Handle manual terraform destroy with timeout and error handling
       - name: Manual Terraform destroy
         if: ${{ github.event.inputs.confirm_destroy == 'yes' }}
         run: |
           cd ${{ steps.find-terraform.outputs.terraform_path }}
+          
+          # First remove node groups to prevent destroy timeouts
+          echo "Removing EKS node groups first..."
+          terraform state list | grep aws_eks_node_group || echo "No node groups found"
+          terraform state list | grep aws_eks_node_group | xargs -r terraform destroy -auto-approve -target
+          
+          # Then remove EKS cluster
+          echo "Removing EKS cluster..."
+          terraform state list | grep aws_eks_cluster || echo "No EKS cluster found"
+          terraform state list | grep aws_eks_cluster | xargs -r terraform destroy -auto-approve -target
+          
+          # Finally destroy everything else
+          echo "Destroying remaining resources..."
           terraform destroy -auto-approve
+          
           echo "Terraform resources destroyed successfully."
 
       # Exit early if this is just a destroy operation
@@ -159,10 +183,10 @@ jobs:
           
           if [ -n "$DOCKER_DIR" ]; then
             cd "$DOCKER_DIR"
-            docker build -t ${{ env.ECR_REPOSITORY }}:latest . && \
-            docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.check-ecr.outputs.ECR_URI }}:latest && \
-            docker push ${{ steps.check-ecr.outputs.ECR_URI }}:latest && \
-            echo "docker_success=true" >> $GITHUB_OUTPUT || echo "docker_success=false" >> $GITHUB_OUTPUT
+            docker build -t ${{ env.ECR_REPOSITORY }}:latest . || { echo "docker_success=false" >> $GITHUB_OUTPUT; exit 1; }
+            docker tag ${{ env.ECR_REPOSITORY }}:latest ${{ steps.check-ecr.outputs.ECR_URI }}:latest || { echo "docker_success=false" >> $GITHUB_OUTPUT; exit 1; }
+            docker push ${{ steps.check-ecr.outputs.ECR_URI }}:latest || { echo "docker_success=false" >> $GITHUB_OUTPUT; exit 1; }
+            echo "docker_success=true" >> $GITHUB_OUTPUT
           else
             echo "ERROR: Docker directory not found."
             echo "docker_success=false" >> $GITHUB_OUTPUT
@@ -183,11 +207,11 @@ jobs:
           
           if [ -n "$K8S_DIR" ]; then
             cd "$K8S_DIR"
-            kubectl apply -f k8s-deployment.yml
+            kubectl apply -f k8s-deployment.yml || { echo "k8s_success=false" >> $GITHUB_OUTPUT; exit 1; }
             
             if [ "${{ steps.check-docker.outputs.docker_available }}" == "true" ] && [ "${{ steps.docker-build.outputs.docker_success }}" == "true" ]; then
-              kubectl set image deployment/supermario-game supermario-game=${{ steps.check-ecr.outputs.ECR_URI }}:latest
-              kubectl rollout status deployment/supermario-game --timeout=180s
+              kubectl set image deployment/supermario-game supermario-game=${{ steps.check-ecr.outputs.ECR_URI }}:latest || { echo "k8s_success=false" >> $GITHUB_OUTPUT; exit 1; }
+              kubectl rollout status deployment/supermario-game --timeout=180s || { echo "k8s_success=false" >> $GITHUB_OUTPUT; exit 1; }
               echo "k8s_success=true" >> $GITHUB_OUTPUT
             else
               echo "WARNING: Skipping image update due to docker build failure"
@@ -199,11 +223,31 @@ jobs:
             exit 1
           fi
 
-      # Cleanup on failure
+      # Fix 3: Improved cleanup on failure with proper EKS resource handling
       - name: Cleanup on failure
         if: failure() || steps.k8s-deploy.outputs.k8s_success == 'false' || steps.docker-build.outputs.docker_success == 'false'
         run: |
           echo "Deployment failed, cleaning up resources..."
           cd ${{ steps.find-terraform.outputs.terraform_path }}
-          terraform destroy -auto-approve
+          
+          # Step 1: Drain node groups - this helps avoid EKS stuck state
+          if kubectl get nodes &>/dev/null; then
+            echo "Draining all nodes..."
+            kubectl get nodes -o name | xargs -r -I{} kubectl drain {} --delete-emptydir-data --force --ignore-daemonsets
+          fi
+          
+          # Step 2: Delete node groups first using terraform
+          echo "Removing EKS node groups..."
+          terraform state list | grep aws_eks_node_group || echo "No node groups found"
+          terraform state list | grep aws_eks_node_group | xargs -r terraform destroy -auto-approve -target
+          
+          # Step 3: Delete EKS cluster
+          echo "Removing EKS cluster..."
+          terraform state list | grep aws_eks_cluster || echo "No EKS cluster found"
+          terraform state list | grep aws_eks_cluster | xargs -r terraform destroy -auto-approve -target
+          
+          # Step 4: Delete everything else
+          echo "Destroying remaining resources..."
+          terraform destroy -auto-approve -parallelism=10
+          
           echo "Resources destroyed successfully after failed deployment."
