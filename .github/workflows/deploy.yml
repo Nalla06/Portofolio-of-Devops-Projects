@@ -33,6 +33,16 @@ jobs:
         with:
           node-version: '14'
 
+      - name: Ensure AWS CLI is available
+        run: |
+          echo "HOME: $HOME"
+          echo "AWS CLI path: $HOME/aws-cli/v2/2.24.7/dist"
+          export PATH=$HOME/aws-cli/v2/2.24.7/dist:$PATH
+          echo "export PATH=$HOME/aws-cli/v2/2.24.7/dist:$PATH" >> $HOME/.bashrc
+          source $HOME/.bashrc
+          echo "AWS CLI Version: $(aws --version)"
+        
+
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v1
         with:
@@ -79,6 +89,8 @@ jobs:
           if ! aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} >/dev/null 2>&1; then
             echo "Creating ECR repository..."
             aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }}
+          else
+            echo "ECR repository already exists."
           fi
           
           ECR_URI=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
@@ -94,6 +106,10 @@ jobs:
           
           echo "Building Docker image..."
           cd $DOCKER_DIR
+          if [ ! -f "Dockerfile" ]; then
+            echo "Error: Dockerfile not found at $DOCKER_DIR"
+            exit 1
+          fi
           docker build -t ${{ env.ECR_REPOSITORY }}:latest .
           docker tag ${{ env.ECR_REPOSITORY }}:latest ${ECR_URI}:latest
           
