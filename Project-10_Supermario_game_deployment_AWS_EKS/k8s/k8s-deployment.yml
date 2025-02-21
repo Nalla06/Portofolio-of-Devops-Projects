@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
       - name: supermario-game
-        image: <ECR_REPOSITORY_URI>:latest
+        image: 631172387421.dkr.ecr.us-east-1.amazonaws.com/supermario-game:latest
         ports:
         - containerPort: 3000
