@@ -1,0 +1,149 @@
+name: Deploy Super Mario Game to EKS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: "Type 'yes' to confirm Terraform destroy"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    env:
+      AWS_REGION: us-east-1
+      ECR_REPOSITORY: supermario-game
+      CLUSTER_NAME: super-mario-eks
+      TERRAFORM_DIR: /home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/terraform-files
+
+    steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Ensure AWS CLI is available
+        run: |
+          echo "HOME: $HOME"
+          echo "AWS CLI path: $HOME/aws-cli/v2/2.24.7/dist"
+          export PATH=$HOME/aws-cli/v2/2.24.7/dist:$PATH
+          echo "export PATH=$HOME/aws-cli/v2/2.24.7/dist:$PATH" >> $HOME/.bashrc
+          source $HOME/.bashrc
+          echo "AWS CLI Version: $(aws --version)"
+        
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: "1.0.0"
+
+      - name: Verify Terraform directory
+        run: |
+          echo "Checking Terraform directory..."
+          if [ ! -d "${{ env.TERRAFORM_DIR }}" ]; then
+            echo "Error: Terraform directory not found at ${{ env.TERRAFORM_DIR }}"
+            exit 1
+          fi
+          echo "Found Terraform directory. Contents:"
+          ls -la ${{ env.TERRAFORM_DIR }}
+
+      - name: Initialize Terraform
+        run: |
+          cd ${{ env.TERRAFORM_DIR }}
+          echo "Initializing Terraform in $(pwd)"
+          terraform init
+
+      - name: Destroy Terraform resources if requested
+        if: ${{ github.event.inputs.confirm_destroy == 'yes' }}
+        run: |
+          cd ${{ env.TERRAFORM_DIR }}
+          echo "Starting Terraform destroy..."
+          terraform destroy -auto-approve
+
+      - name: Apply Terraform if not destroying
+        if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
+        run: |
+          cd ${{ env.TERRAFORM_DIR }}
+          echo "Starting Terraform apply..."
+          terraform apply -auto-approve
+          echo "Waiting for infrastructure to be ready..."
+          sleep 30
+
+      - name: Configure ECR and build/push image
+        if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
+        run: |
+          DOCKER_DIR=/home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/docker
+          
+          echo "Setting up ECR repository..."
+          if ! aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} >/dev/null 2>&1; then
+            echo "Creating ECR repository..."
+            aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY }}
+          else
+            echo "ECR repository already exists."
+          fi
+          
+          ECR_URI=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
+          echo "ECR URI: $ECR_URI"
+          
+          if [ ! -d "$DOCKER_DIR" ]; then
+            echo "Error: Docker directory not found at $DOCKER_DIR"
+            exit 1
+          fi
+          
+          echo "Logging into ECR..."
+          aws ecr get-login-password | docker login --username AWS --password-stdin ${ECR_URI}
+          
+          echo "Building Docker image..."
+          cd $DOCKER_DIR
+          if [ ! -f "Dockerfile" ]; then
+            echo "Error: Dockerfile not found at $DOCKER_DIR"
+            exit 1
+          fi
+          docker build -t ${{ env.ECR_REPOSITORY }}:latest .
+          docker tag ${{ env.ECR_REPOSITORY }}:latest ${ECR_URI}:latest
+          
+          echo "Pushing image to ECR..."
+          docker push ${ECR_URI}:latest
+
+      - name: Configure kubectl
+        if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
+        uses: azure/setup-kubectl@v3
+
+      - name: Deploy to Kubernetes
+        if: ${{ github.event.inputs.confirm_destroy != 'yes' }}
+        run: |
+          K8S_DIR=/home/nalla/Portofolio-of-Devops-Projects/Project-10_Supermario_game_deployment_AWS_EKS/k8s
+          
+          echo "Configuring kubectl..."
+          aws eks update-kubeconfig --name ${{ env.CLUSTER_NAME }}
+          
+          if [ ! -d "$K8S_DIR" ]; then
+            echo "Error: k8s directory not found at $K8S_DIR"
+            exit 1
+          fi
+          
+          cd $K8S_DIR
+          echo "Applying Kubernetes configurations..."
+          kubectl apply -f k8s-deployment.yml
+          
+          echo "Updating deployment with new image..."
+          ECR_URI=$(aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY }} --query 'repositories[0].repositoryUri' --output text)
+          kubectl set image deployment/supermario-game supermario-game=${ECR_URI}:latest
+          
+          echo "Waiting for deployment to complete..."
+          kubectl rollout status deployment/supermario-game --timeout=180s
+          
+          echo "Getting service URL..."
+          HOSTNAME=$(kubectl get svc supermario-service -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
+          echo "Service is available at: $HOSTNAME"

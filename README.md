@@ -136,6 +136,20 @@ The following tools and technologies have been integrated to automate a full CI/
 8. Deployment: Deploy Docker images to EKS using Kubernetes resources.
 9. Monitoring: Prometheus and Grafana for cluster monitoring.
 
+# Project-09: Netflix Clone DevOps Infrastructure
+
+This repository contains the complete infrastructure as code (IaC) setup for deploying a Netflix clone application using a modern DevOps pipeline. The infrastructure includes Terraform for provisioning AWS resources, Ansible for configuration management, Jenkins for CI/CD pipelines, Docker for containerization, and Kubernetes for orchestration.
+![devsecops](https://imgur.com/vORuBnK.png)
+
+## Overview
+
+The infrastructure is designed with the following components:
+
+1. Jenkins server for CI/CD pipeline execution
+2. Kubernetes cluster (master and agent) for application deployment
+3. Prometheus and Grafana server for monitoring
+4. Integration with Trivy for security scanning and SonarQube for code quality
+
 # Project-10 Super Mario Game Deployment on AWS EKS
 
 
