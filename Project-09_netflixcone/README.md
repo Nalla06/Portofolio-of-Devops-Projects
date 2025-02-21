@@ -9,11 +9,29 @@ The infrastructure is designed with the following components:
 - Kubernetes cluster (master and agent) for application deployment
 - Prometheus and Grafana server for monitoring
 - Integration with Trivy for security scanning and SonarQube for code quality
+
+## Project-structure:
+
+# Netflix Clone DevOps Infrastructure
+
+This repository contains the complete infrastructure as code (IaC) setup for deploying a Netflix clone application using a modern DevOps pipeline. The infrastructure includes Terraform for provisioning AWS resources, Ansible for configuration management, Jenkins for CI/CD pipelines, Docker for containerization, and Kubernetes for orchestration.
+
+## Architecture Overview
+
+The infrastructure is designed with the following components:
+- Jenkins server for CI/CD pipeline execution
+- Kubernetes cluster (master and agent) for application deployment
+- Prometheus and Grafana server for monitoring
+- Integration with Trivy for security scanning and SonarQube for code quality
+
+## Project Structure:
+
+```plaintext
 Netflix-Clone-Project/
 │
 ├── terraform/
 │   ├── main.tf                     # Main Terraform file for provisioning EC2 instances
-│   ├── security.tf                # Variables for EC2 instances, VPC, etc.
+│   ├── security.tf                 # Variables for EC2 instances, VPC, etc.
 │
 ├── ansible/
 │   ├── playbooks/
