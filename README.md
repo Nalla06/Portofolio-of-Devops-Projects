@@ -102,6 +102,7 @@ Terraform was used to provision the EC2 instance, security groups, and networkin
 
 # Project-06 : 2048 Game App on EKS Deployment 
 
+This project demonstrates the deployment of the 2048 Game App on Amazon EKS using two methods:
 ![EKS](https://imgur.com/oADneqS.png)
 
 This project demonstrates the deployment of the 2048 Game App on Amazon EKS using two methods:
@@ -138,7 +139,8 @@ The following tools and technologies have been integrated to automate a full CI/
 
 # Project-09: Netflix Clone DevOps Infrastructure
 
-This repository contains the complete infrastructure as code (IaC) setup for deploying a Netflix clone application using a modern DevOps pipeline. The infrastructure includes Terraform for provisioning AWS resources, Ansible for configuration management, Jenkins for CI/CD pipelines, Docker for containerization, and Kubernetes for orchestration.
+This project contains the complete infrastructure as code (IaC) setup for deploying a Netflix clone application using a modern DevOps pipeline. The infrastructure includes Terraform for provisioning AWS resources, Ansible for configuration management, Jenkins for CI/CD pipelines, Docker for containerization, and Kubernetes for orchestration.
+
 ![devsecops](https://imgur.com/vORuBnK.png)
 
 ## Overview
@@ -150,20 +152,17 @@ The infrastructure is designed with the following components:
 3. Prometheus and Grafana server for monitoring
 4. Integration with Trivy for security scanning and SonarQube for code quality
 
-# Project-10 Super Mario Game Deployment on AWS EKS
+# Project-10 Super Mario Game Deployment on AWS EKS with GitHub Actions
 
+This project implements a fully automated deployment pipeline for a Super Mario game clone on AWS EKS. Using GitHub Actions, the pipeline provisions infrastructure with Terraform, builds and pushes Docker images to ECR, and deploys the application to EKS.
 
 ![supermario](https://imgur.com/rC4Qe8g.png)
 
+## Overview
 
-## **Overview**
-
-This project automates the deployment of the Super Mario game on an AWS EKS cluster using **Terraform, Ansible, and Jenkins**. The workflow provisions an EC2 instance, sets up an EKS cluster, and deploys the containerized Super Mario game on Kubernetes.
-
-## **Project Architecture**
-
-1. **Terraform** provisions an AWS EC2 instance and an EKS cluster.
-2. **Ansible** installs necessary tools (AWS CLI, Terraform, kubectl, Helm) on EC2.
-3. **Terraform** creates EKS cluster and provisions worker nodes.
-4. **Kubernetes** deploys the Super Mario game using a YAML configuration.
-5. **Jenkins** automates the entire process.
+1. GitHub Actions: Automation pipeline orchestrator
+2. Terraform: Infrastructure as Code for AWS resources
+3. AWS ECR: Container registry for game images
+4. AWS EKS: Kubernetes service for container orchestration
+5. Docker: Containerization of the Super Mario game
+6. Kubernetes: Orchestration of game containers
