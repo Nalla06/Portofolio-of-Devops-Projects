@@ -1,5 +1,6 @@
 # Portofolio-of-Devops-Implementations
-This repository showcases various DevOps projects that demonstrate my skills in CI/CD, containerization, infrastructure automation, and cloud deployments. Each project includes practical examples of using tools like Jenkins, GitLab CI/CD, Docker, Kubernetes, Terraform, and AWS.
+
+This repository showcases various DevOps projects that demonstrate my skills in CI/CD, containerization, infrastructure automation, and cloud deployments. Each project includes practical examples of using tools like Jenkins, GitLab CI/CD, Docker, Kubernetes, Ansible,Terraform, and AWS.
 
 ##  Project-01: Deploy Java Application on AWS 3-Tier Architecture
 
@@ -21,34 +22,6 @@ This project focuses on deploying a Java-based application using an AWS 3-tier a
 5. Set up CloudWatch monitoring for logs and alarms.
 
 This project highlights end-to-end deployment using best practices in AWS infrastructure design and DevOps tools.
-
-# Project-02: Linux Basics for Cloud & DevOps Engineers
-Overview
-
-![Linux](https://imgur.com/xedzuwy.png)
-
-This assignment covers fundamental Linux skills required for DevOps engineers. It involves user and group management, file system operations, and AWS EC2 management.
-
-## Tasks Overview
-
-### User & Group Management:
-- Create users and groups  
-- Assign primary and secondary groups  
-- Set file and directory permissions  
-
-### File System Operations:
-- Create, move, rename, and delete files & directories  
-- Modify file contents using CLI and editors  
-
-### AWS EBS Volume Management:
-- Attach, format, mount, and verify EBS volume  
-- Unmount and delete storage  
-
-### Cleanup & Termination:
-- Delete users, groups, and home directories  
-- Detach and delete EBS volume  
-- Terminate EC2 instance  
-
 
 # Project-03 : Deploying Django App on AWS Fargate using Terraform
  
@@ -114,6 +87,27 @@ This method involves manually building and deploying the app using Docker to con
 
 In this method, Terraform is used to automate the entire deployment process, including the creation of VPC, EKS cluster, and the Kubernetes resources necessary for the game app.
 
+# Project-07: Implementation of the Entire Advanced CI/CD Pipeline with Major DevOps Tools
+
+![devops](https://imgur.com/WcCpKVU.png)
+
+## Overview
+
+This project sets up a Jenkins CI/CD pipeline on AWS using Terraform. It provisions a Virtual Private Cloud (VPC), subnets, security groups, and EC2 instances for Ansible, Jenkins Master, and Jenkins Agent.
+
+## Steps Followed in the Implementation of the Entire CI/CD Pipeline:
+
+The following tools and technologies have been integrated to automate a full CI/CD pipeline:
+
+1. Infrastructure Provisioning: Terraform for VPC, EC2 instances, security groups.
+2. Configuration Management: Ansible for Jenkins configuration and SSH key management.
+3. CI/CD Pipeline: Jenkins with multibranch pipeline, GitHub webhook triggers.
+4. Code Quality: SonarQube integration for static code analysis.
+5. Artifact Management: JFrog Artifactory for storing Docker images and build artifacts.
+6. Containerization: Docker for creating container images.
+7. Container Orchestration: AWS EKS for Kubernetes container management.
+8. Deployment: Deploy Docker images to EKS using Kubernetes resources.
+9. Monitoring: Prometheus and Grafana for cluster monitoring.
 
 # Project-10 Super Mario Game Deployment on AWS EKS
 
