@@ -39,10 +39,10 @@ GitHub Actions Workflow
 .
 ├── .github/
 │   └── workflows/
-│       └── deploy.yml      # GitHub Actions workflow definition
+│       └── deploy.yml    # GitHub Actions workflow definition
 ├── terraform/
 │   ├── main.tf           # EKS cluster and ECR repository configuration
-│   ├── security_group.tf      # Terraform variables
+│   ├── security_group.tf # Terraform security
 ├── kubernetes/
 │   ├── deployment.yaml   # Kubernetes deployment configuration
 │   ├── service.yaml      # Kubernetes service configuration
@@ -50,7 +50,7 @@ GitHub Actions Workflow
 ├── docker/
 │   ├── Dockerfile        # Container definition for Super Mario game
 │   ├── package.json      # Key dependencies include
-│   └── index.js           # sets up middleware, and establishes API routes
+│   └── index.js          # sets up middleware, and establishes API routes
 └── README.md             # This documentation
 ```
 
