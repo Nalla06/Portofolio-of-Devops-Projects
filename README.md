@@ -1,6 +1,5 @@
 # Portofolio-of-Devops-Implementations
-
-This repository showcases various DevOps projects that demonstrate my skills in CI/CD, containerization, infrastructure automation, and cloud deployments. Each project includes practical examples of using tools like Jenkins, GitLab CI/CD, Docker, Kubernetes, Ansible,Terraform, and AWS.
+This repository showcases various DevOps projects that demonstrate my skills in CI/CD, containerization, infrastructure automation, and cloud deployments. Each project includes practical examples of using tools like Jenkins, GitLab CI/CD, Docker, Kubernetes, Terraform, and AWS.
 
 ##  Project-01: Deploy Java Application on AWS 3-Tier Architecture
 
@@ -23,9 +22,37 @@ This project focuses on deploying a Java-based application using an AWS 3-tier a
 
 This project highlights end-to-end deployment using best practices in AWS infrastructure design and DevOps tools.
 
+# Project-02: Linux Basics for Cloud & DevOps Engineers
+Overview
+
+![Linux](https://imgur.com/xedzuwy.png)
+
+This assignment covers fundamental Linux skills required for DevOps engineers. It involves user and group management, file system operations, and AWS EC2 management.
+
+## Tasks Overview
+
+### User & Group Management:
+- Create users and groups  
+- Assign primary and secondary groups  
+- Set file and directory permissions  
+
+### File System Operations:
+- Create, move, rename, and delete files & directories  
+- Modify file contents using CLI and editors  
+
+### AWS EBS Volume Management:
+- Attach, format, mount, and verify EBS volume  
+- Unmount and delete storage  
+
+### Cleanup & Termination:
+- Delete users, groups, and home directories  
+- Detach and delete EBS volume  
+- Terminate EC2 instance  
+
+
 # Project-03 : Deploying Django App on AWS Fargate using Terraform
  
-![AWS](https://imgur.com/a/ZxSC4ZK.png)
+![AWS](https://imgur.com/wLMcRHS.jpg)
 
 ### **Project Overview: 
 
