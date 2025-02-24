@@ -40,8 +40,9 @@ JENKINS_URL="http://localhost:8080"
 JENKINS_ADMIN_PASS=$(sudo cat /var/lib/jenkins/secrets/initialAdminPassword)
 
 sudo wget "${JENKINS_URL}/jnlpJars/jenkins-cli.jar" -O $JENKINS_CLI_JAR
-PLUGINS="git github maven-plugin docker-plugin pipeline-utility-steps publish-over-ssh"
-
+# Define necessary plugins for the application (Add or remove plugins as required)
+PLUGINS="docker-plugin maven-plugin workflow-aggregator publish-over-ssh git-plugin github-plugin blueocean deploy-to-container-plugin credentials-binding-plugin aws-code-deploy-plugin terraform-plugin docker-workflow"
+# Loop to install plugins
 for plugin in $PLUGINS; do
   java -jar $JENKINS_CLI_JAR -s $JENKINS_URL -auth admin:$JENKINS_ADMIN_PASS install-plugin $plugin
 done
