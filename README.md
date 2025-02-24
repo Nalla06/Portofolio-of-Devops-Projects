@@ -103,9 +103,10 @@ Terraform was used to provision the EC2 instance, security groups, and networkin
 # Project-06 : 2048 Game App on EKS Deployment 
 
 This project demonstrates the deployment of the 2048 Game App on Amazon EKS using two methods:
+
 ![EKS](https://imgur.com/oADneqS.png)
 
-This project demonstrates the deployment of the 2048 Game App on Amazon EKS using two methods:
+
 
 ## Type 1: Manual Deployment
 
