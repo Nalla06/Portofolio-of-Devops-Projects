@@ -51,8 +51,8 @@ variable "docker_image_url_django" {
 }
 
 #variable "docker_image_url_django" {
- # description = "Docker image to run in the ECS cluster"
- # default     = "<AWS_ACCOUNT_ID>.dkr.ecr.us-west-1.amazonaws.com/django-app:latest"
+ #description = "Docker image to run in the ECS cluster"
+ #default     = "631172387421.dkr.ecr.us-west-1.amazonaws.com/django-app"
 #}
 
 variable "app_count" {
@@ -106,7 +106,7 @@ variable "rds_instance_class" {
 
 variable "certificate_arn" {
   description = "AWS Certificate Manager ARN for validated domain"
-  default     = "arn:aws:acm:us-west-1:631172387421:certificate/046dde10-5b10-4645-a7c1-d891260d71d8"
+  default     = "arn:aws:acm:us-west-1:631172387421:certificate/485ae62d-6acf-4885-969c-ba744b4ec0d4"
 }
 # nginx
 

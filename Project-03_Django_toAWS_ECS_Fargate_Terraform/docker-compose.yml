@@ -1,0 +1,12 @@
+services:
+  web:
+    image: django-app
+    container_name: django_container
+    volumes:
+      - ./hello_world_django_app/db.sqlite3:/usr/src/app/db.sqlite3  # Correct the path here # Removing :ro (read-only flag)
+    ports:
+      - "8001:8000"
+    environment:
+      - DEBUG=True
+      - DJANGO_SECRET_KEY='django-insecure-_=p2z5%#%3p2sxugs_2y@y*%@2t*-z_^pp+^h87e4b$t4^w5%='
+    command: python manage.py runserver 0.0.0.0:8000
