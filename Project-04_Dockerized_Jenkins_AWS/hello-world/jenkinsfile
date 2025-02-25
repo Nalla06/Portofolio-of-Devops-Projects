@@ -2,13 +2,13 @@ pipeline {
     agent any
 
     environment {
-        // Define variables for the Docker image and repository paths
-        DOCKER_IMAGE_NAME = 'nalla06/tomcatserver' // Docker Hub image name
-        DOCKER_IMAGE_TAG = 'latest' // Image tag (latest)
-        GITHUB_REPO_URL = 'https://github.com/Nalla06/Portofolio-of-Devops-Projects.git'
-        GITHUB_BRANCH = 'main'
-        ARTIFACTS_DIR = 'target'  // Directory for storing build artifacts
-        ARTIFACTS_PATH = 'Project-04_Dockerized_Jenkins_AWS/hello-world/target/*.jar'  // Path to JAR file
+        // Set environment variables for your EC2 instance
+        EC2_HOST = "ec2-user@204.236.210.50" // Replace with your EC2 instance IP
+        DOCKER_REGISTRY = "nalla06" // Replace with your DockerHub username (if using)
+        DOCKER_IMAGE = "tomcatserverr" // Replace with your image name (or adjust based on your naming)
+        MAVEN_HOME = "/usr/share/maven" // Path to Maven if it's not automatically detected
+        REPO_URL = "https://github.com/Nalla06/Portofolio-of-Devops-Projects.git"
+        BRANCH = "main" // Set your branch name if it's different
     }
 
     stages {
@@ -16,74 +16,65 @@ pipeline {
             steps {
                 echo 'Cloning GitHub repository...'
                 // Clone the repository
-                git url: "${GITHUB_REPO_URL}", branch: "${GITHUB_BRANCH}"
+                git url: "$REPO_URL", branch: "$BRANCH"
             }
         }
 
-        stage('Build Artifacts') {
+        stage('Build WAR') {
             steps {
-                echo 'Building artifacts...'
                 script {
-                    // Navigate to the directory containing the Maven project
-                    dir('Project-04_Dockerized_Jenkins_AWS/hello-world') {
-                        // Run Maven build to generate artifacts (JAR file)
-                        sh 'mvn clean install'
-                    }
+                    // Run Maven to build the WAR file
+                    sh 'cd Project-04_Dockerized_Jenkins_AWS && mvn clean package'
                 }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                echo 'Building Docker image with the artifact...'
                 script {
-                    // Build the Docker image and include the generated artifact
-                    // Make sure your Dockerfile is set to COPY the WAR/JAR file into the container
-                    sh 'docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} .'
+                    // Build Docker image from the Dockerfile
+                    sh 'cd Project-04_Dockerized_Jenkins_AWS && docker build -t $DOCKER_REGISTRY/$DOCKER_IMAGE:latest .'
                 }
             }
         }
 
-        stage('Push Docker Image to Docker Hub') {
+        stage('Push Docker Image') {
             steps {
-                echo 'Pushing Docker image to Docker Hub...'
                 script {
-                    // Login to Docker Hub and push the image
-                    withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASSWORD')]) {
-                        sh 'echo $DOCKER_PASSWORD | docker login -u $DOCKER_USER --password-stdin'
-                        sh 'docker push ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}'
+                    // Login to Docker Hub and push the Docker image
+                    withCredentials([string(credentialsId: 'DOCKER_PASSWORD', variable: 'DOCKER_PASSWORD')]) {
+                        // Logout from Docker in case of expired or previous session
+                        sh 'docker logout'
+                        
+                        // Login to Docker Hub
+                        sh 'docker login -u $DOCKER_REGISTRY -p $DOCKER_PASSWORD'
+                        
+                        // Push the Docker image to Docker Hub
+                        sh 'docker push $DOCKER_REGISTRY/$DOCKER_IMAGE:latest'
                     }
                 }
             }
         }
 
-        stage('Run Docker Container') {
+        stage('Deploy to EC2') {
             steps {
-                echo 'Running Docker container...'
                 script {
-                    // Run the Docker container using the pushed image
-                    sh 'docker run -d -p 8085:8085 ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}'
-                }
-            }
-        }
-
-        stage('Deploy Application') {
-            steps {
-                echo 'Deploying application...'
-                script {
-                    // Example deploy step (You can customize this to deploy the application to an environment)
-                    echo 'Deploying to the environment...'
+                    // Deploy the Docker image to EC2
+                    withCredentials([sshUserPrivateKey(credentialsId: 'linux-key-pair', keyFileVariable: 'EC2_SSH_KEY_PATH')]) {
+                        sh """
+                            echo \$EC2_SSH_KEY_PATH
+                            ssh -o StrictHostKeyChecking=no -i \$EC2_SSH_KEY_PATH ec2-user@204.236.210.50 'docker pull $DOCKER_REGISTRY/$DOCKER_IMAGE:latest && docker run -d -p 8080:8080 $DOCKER_REGISTRY/$DOCKER_IMAGE:latest'
+                        """
+                    }
                 }
             }
         }
     }
 
     post {
-        success {
-            echo 'Pipeline completed successfully!'
-        }
-        failure {
-            echo 'Pipeline failed!'
+        always {
+            // Clean up Docker images to free up space
+            sh 'docker system prune -f'
         }
     }
 }
