@@ -22,6 +22,11 @@ This project focuses on deploying a Java-based application using an AWS 3-tier a
 
 This project highlights end-to-end deployment using best practices in AWS infrastructure design and DevOps tools.
 
+## Images
+Here are some images related to the deployment process:
+
+![Image 1](images/image-01.png).
+
 # Project-02: Linux Basics for Cloud & DevOps Engineers
 Overview
 
@@ -50,7 +55,7 @@ This assignment covers fundamental Linux skills required for DevOps engineers. I
 - Terminate EC2 instance  
 
 
-# Project-03 : Deploying Django App on AWS Fargate using Terraform
+# Project-05 : Deploying Django App on AWS Fargate using Terraform
  
 ![AWS](https://imgur.com/wLMcRHS.jpg)
 
@@ -66,6 +71,13 @@ This project demonstrates how to deploy a scalable, production-ready Django appl
 - **Secure HTTPS Traffic**: Configure SSL with AWS ACM for a secure HTTPS connection.
 - **Scalability**: Leverage ECS Fargate for serverless container orchestration, ensuring that the application scales seamlessly based on demand.
 - **Efficient Static File Management**: Use Nginx to serve static files, optimizing performance and ensuring a smooth user experience.
+
+## Images
+Here are some images related to the deployment process:
+
+![Image 1](images/image-02.png).
+![Image 1](images/image-03.png).
+
 
 # Project-04 :  Java Web App Deployment on Docker Using Jenkins and AWS
 
@@ -98,6 +110,11 @@ Terraform was used to provision the EC2 instance, security groups, and networkin
    . Creates a Docker image and pushes it to Docker Hub.
    . Deploys the app as a Docker container.
 
+## Images
+Here are some images related to the deployment process:
+
+![Image 1](images/image-04.png).
+![Image 1](images/image-05.png).
 
 
 # Project-06 : 2048 Game App on EKS Deployment 
@@ -167,3 +184,8 @@ This project implements a fully automated deployment pipeline for a Super Mario 
 4. AWS EKS: Kubernetes service for container orchestration
 5. Docker: Containerization of the Super Mario game
 6. Kubernetes: Orchestration of game containers
+
+## Images
+Here are some images related to the deployment process:
+
+![Image 1](images/image-06.png).
