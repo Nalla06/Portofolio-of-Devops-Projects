@@ -1,5 +1,5 @@
 # Pull official base image for Python 3.10
-FROM python:3.10.10-slim
+FROM python:3.13.5-slim
 
 # Set work directory
 WORKDIR /usr/src/app
