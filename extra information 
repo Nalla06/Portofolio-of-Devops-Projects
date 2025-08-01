@@ -104,7 +104,8 @@ This document serves as a reference for deploying different types of application
 4. **Push to AWS ECR**
    ```sh
    docker build -t my-java-app .
-   docker tag my-java-app:latest <AWS_ACCOUNT_ID>.dkr.ecr.us-west-1.amazonaws.com/my-java-app
+   docker tag my-java-app:latest <AWS_ACCOUNT_ID>.dkr.ecr.us-west-1.amazonaws.com/my-java 
+   app
    docker push <AWS_ACCOUNT_ID>.dkr.ecr.us-west-1.amazonaws.com/my-java-app
    ```
 5. **Deploy on AWS ECS (Fargate)**

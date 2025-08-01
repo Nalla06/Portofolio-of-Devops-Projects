@@ -55,37 +55,20 @@ This assignment covers fundamental Linux skills required for DevOps engineers. I
 - Terminate EC2 instance  
 
 
-# Project-05 : Deploying Django App on AWS Fargate using Terraform
- 
-![AWS](https://imgur.com/wLMcRHS.jpg)
-
-### **Project Overview: 
-
-This project demonstrates how to deploy a scalable, production-ready Django application using AWS Fargate and Terraform. The application is containerized with Docker, provisioned on Amazon ECS using Fargate, and connected to a managed PostgreSQL database via AWS RDS. The solution is optimized for scalability, high availability, and security, ensuring the app can handle production traffic with ease.
-
-**Key Features:**
-
-- **Infrastructure as Code**: Provision all AWS resources, including VPC, ECS Cluster, RDS, and ECR, using Terraform.
-- **Containerization**: Build and store the Django app Docker image in AWS ECR for deployment to ECS Fargate.
-- **Database Persistence**: Use AWS RDS to provide managed PostgreSQL database persistence for the Django application.
-- **Secure HTTPS Traffic**: Configure SSL with AWS ACM for a secure HTTPS connection.
-- **Scalability**: Leverage ECS Fargate for serverless container orchestration, ensuring that the application scales seamlessly based on demand.
-- **Efficient Static File Management**: Use Nginx to serve static files, optimizing performance and ensuring a smooth user experience.
-
-## Images
-Here are some images related to the deployment process:
-
-![Image 1](images/image-02.png).
-![Image 1](images/image-03.png).
-
-
-# Project-04 :  Java Web App Deployment on Docker Using Jenkins and AWS
+# Project-03 :  Java Web App Deployment on Docker Using Jenkins and AWS
 
 ![AWS](https://imgur.com/Hk28ffE.png)
 
 # Project Overview
 
 This project demonstrates the deployment of a Java Web application on a Docker container hosted on an AWS EC2 instance using Jenkins as the CI/CD automation tool. By integrating Terraform for infrastructure provisioning and automation scripts for setup, this project achieves a seamless deployment process. The deployed application runs on a Tomcat Docker image, with the containerized app being managed via Jenkins pipelines.
+
+
+## Images
+Here are some images related to the deployment process:
+
+![Image 1](images/image-04.png).
+![Image 1](images/image-05.png).
 
 ## Automation Using Terraform
 ### How Terraform Was Used:
@@ -110,19 +93,34 @@ Terraform was used to provision the EC2 instance, security groups, and networkin
    . Creates a Docker image and pushes it to Docker Hub.
    . Deploys the app as a Docker container.
 
+# Project-04 : Deploying Django App on AWS Fargate using Terraform
+ 
+![AWS](https://imgur.com/wLMcRHS.jpg)
+
+### **Project Overview: 
+
+This project demonstrates how to deploy a scalable, production-ready Django application using AWS Fargate and Terraform. The application is containerized with Docker, provisioned on Amazon ECS using Fargate, and connected to a managed PostgreSQL database via AWS RDS. The solution is optimized for scalability, high availability, and security, ensuring the app can handle production traffic with ease.
+
+**Key Features:**
+
+- **Infrastructure as Code**: Provision all AWS resources, including VPC, ECS Cluster, RDS, and ECR, using Terraform.
+- **Containerization**: Build and store the Django app Docker image in AWS ECR for deployment to ECS Fargate.
+- **Database Persistence**: Use AWS RDS to provide managed PostgreSQL database persistence for the Django application.
+- **Secure HTTPS Traffic**: Configure SSL with AWS ACM for a secure HTTPS connection.
+- **Scalability**: Leverage ECS Fargate for serverless container orchestration, ensuring that the application scales seamlessly based on demand.
+- **Efficient Static File Management**: Use Nginx to serve static files, optimizing performance and ensuring a smooth user experience.
+
 ## Images
 Here are some images related to the deployment process:
 
-![Image 1](images/image-04.png).
-![Image 1](images/image-05.png).
+![Image 1](images/image-02.png).
+![Image 1](images/image-03.png).
 
-
-# Project-06 : 2048 Game App on EKS Deployment 
+# Project-05 : 2048 Game App on EKS Deployment 
 
 This project demonstrates the deployment of the 2048 Game App on Amazon EKS using two methods:
 
 ![EKS](https://imgur.com/oADneqS.png)
-
 
 
 ## Type 1: Manual Deployment
@@ -133,29 +131,7 @@ This method involves manually building and deploying the app using Docker to con
 
 In this method, Terraform is used to automate the entire deployment process, including the creation of VPC, EKS cluster, and the Kubernetes resources necessary for the game app.
 
-# Project-07: Implementation of the Entire Advanced CI/CD Pipeline with Major DevOps Tools
-
-![devops](https://imgur.com/WcCpKVU.png)
-
-## Overview
-
-This project sets up a Jenkins CI/CD pipeline on AWS using Terraform. It provisions a Virtual Private Cloud (VPC), subnets, security groups, and EC2 instances for Ansible, Jenkins Master, and Jenkins Agent.
-
-## Steps Followed in the Implementation of the Entire CI/CD Pipeline:
-
-The following tools and technologies have been integrated to automate a full CI/CD pipeline:
-
-1. Infrastructure Provisioning: Terraform for VPC, EC2 instances, security groups.
-2. Configuration Management: Ansible for Jenkins configuration and SSH key management.
-3. CI/CD Pipeline: Jenkins with multibranch pipeline, GitHub webhook triggers.
-4. Code Quality: SonarQube integration for static code analysis.
-5. Artifact Management: JFrog Artifactory for storing Docker images and build artifacts.
-6. Containerization: Docker for creating container images.
-7. Container Orchestration: AWS EKS for Kubernetes container management.
-8. Deployment: Deploy Docker images to EKS using Kubernetes resources.
-9. Monitoring: Prometheus and Grafana for cluster monitoring.
-
-# Project-09: Netflix Clone DevOps Infrastructure
+# Project-06: Netflix Clone DevOps Infrastructure
 
 This project contains the complete infrastructure as code (IaC) setup for deploying a Netflix clone application using a modern DevOps pipeline. The infrastructure includes Terraform for provisioning AWS resources, Ansible for configuration management, Jenkins for CI/CD pipelines, Docker for containerization, and Kubernetes for orchestration.
 
@@ -170,7 +146,7 @@ The infrastructure is designed with the following components:
 3. Prometheus and Grafana server for monitoring
 4. Integration with Trivy for security scanning and SonarQube for code quality
 
-# Project-10 Super Mario Game Deployment on AWS EKS with GitHub Actions
+# Project-07 Super Mario Game Deployment on AWS EKS with GitHub Actions
 
 This project implements a fully automated deployment pipeline for a Super Mario game clone on AWS EKS. Using GitHub Actions, the pipeline provisions infrastructure with Terraform, builds and pushes Docker images to ECR, and deploys the application to EKS.
 
